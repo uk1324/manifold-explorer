@@ -1,0 +1,17 @@
+1/3x = 1/(3x) or (1/3)x
+
+Wolfram alpha parses both as (1/3)x but it parses a/bc as a/(bc) and a/b c as (a/b) * c
+
+x/y/z is equal to x/(y/z) or (x/y)/z
+Wolfram alpha parses x/y/z as (x/y)/z 
+
+ab^c = (ab)^c or a(b^c)
+
+Wolfram alpha parses it as a * (b^c)
+
+x^ax^b is x^(ax^b) or x^a * x^b
+Wolfram alpha parses it as x^a * x^b
+
+x^y^z = (x^y)^z or x^(y^z)
+
+Wolfram alpha parses it as x^(y^z)
