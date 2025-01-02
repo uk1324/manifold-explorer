@@ -30,6 +30,10 @@ bool Algebra::AlgebraicExpr::isProduct() const {
 	return type == AlgebraicExprType::PRODUCT;
 }
 
+bool Algebra::AlgebraicExpr::isSum() const {
+	return type == AlgebraicExprType::SUM;
+}
+
 const IntegerExpr* Algebra::AlgebraicExpr::asInteger() const {
 	ASSERT(isInteger());
 	return static_cast<const IntegerExpr*>(this);
@@ -56,6 +60,15 @@ const ProductExpr* Algebra::AlgebraicExpr::asProduct() const {
 ProductExpr* Algebra::AlgebraicExpr::asProduct() {
 	ASSERT(isProduct());
 	return static_cast<ProductExpr*>(this);
+}
+
+const SumExpr* Algebra::AlgebraicExpr::asSum() const {
+	return const_cast<AlgebraicExpr*>(this)->asSum();
+}
+
+SumExpr* Algebra::AlgebraicExpr::asSum() {
+	ASSERT(isSum());
+	return static_cast<SumExpr*>(this);
 }
 
 IntegerExpr::IntegerExpr(IntegerType value)
@@ -124,7 +137,7 @@ AlgebraicExprPtr Algebra::algebraicExprClone(const AlgebraicExprPtr& exprPtr) {
 	}
 	case RATIONAL: {
 		const auto e = static_cast<const RationalExpr*>(expr);
-		return std::make_unique<RationalExpr>(e->denominator, e->numerator);
+		return std::make_unique<RationalExpr>(e->numerator, e->denominator);
 	}
 	case SYMBOL: {
 		const auto e = static_cast<const SymbolExpr*>(expr);

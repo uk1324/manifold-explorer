@@ -36,6 +36,7 @@ struct IntegerExpr;
 struct RationalExpr;
 struct PowerExpr;
 struct ProductExpr;
+struct SumExpr;
 
 using IntegerType = i64;
 struct AlgebraicExpr {
@@ -48,6 +49,7 @@ struct AlgebraicExpr {
 	bool isRational() const;
 	bool isPower() const;
 	bool isProduct() const;
+	bool isSum() const;
 
 	// Making this function so it's shorter. Also it can check if the type is correct.
 	const IntegerExpr* asInteger() const;
@@ -56,6 +58,8 @@ struct AlgebraicExpr {
 	PowerExpr* asPower();
 	const ProductExpr* asProduct() const;
 	ProductExpr* asProduct();
+	const SumExpr* asSum() const;
+	SumExpr* asSum();
 };
 
 using AlgebraicExprPtr = std::unique_ptr<Algebra::AlgebraicExpr>;

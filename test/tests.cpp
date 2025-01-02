@@ -353,6 +353,14 @@ AlgebraicExprPtr product(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b, AlgebraicEx
 	return std::make_unique<ProductExpr>(std::move(list));
 }
 
+template <typename ...T>
+AlgebraicExprPtr product(T&&... args) {
+	AlgebraicExprList list;
+	//((std::cout << args << std::endl), ...);
+	((list.push_back(std::move(args))), ...);
+	return std::make_unique<ProductExpr>(std::move(list));
+}
+
 AlgebraicExprPtr symbol(const char* symbol) {
 	return std::make_unique<SymbolExpr>(std::string(symbol));
 }
@@ -440,17 +448,159 @@ void algebraicExpressionSimplifyTests() {
 	using namespace AlgebraConstuctionHelpers;
 
 	auto test = [](std::string_view name, const AlgebraicExprPtr& toSimplify, const AlgebraicExprPtr& expected) {
+		bool printInNotation = false;
+		printInNotation = true;
 		const auto simplified = basicSimplifiy(toSimplify);
+		auto print = [&printInNotation](const AlgebraicExprPtr& expr) {
+			if (printInNotation) {
+				printAlgebraicExprUsingNotation(expr);
+				put("");
+			} else {
+				printAlgebraicExpr(expr);
+			}
+		};
+
 		if (algebraicExprEquals(simplified, expected)) {
 			t.printPassed(name);
 		} else {
+			put("simplified :");
+			print(toSimplify);
+
 			t.printFailed(name);
 			put("expected:");
-			printAlgebraicExpr(expected);
+			print(expected);
+			
 			put("got:");
-			printAlgebraicExpr(simplified);
+			print(simplified);
 		}
 	};
+
+	test(
+		"x + (x + y)",
+		sum(symbol("x"), sum(symbol("x"), symbol("y"))),
+		sum(product(integer(2), symbol("x")), symbol("y"))
+	);
+
+	test(
+		"2x + (3/2)x -> (7/2)x",
+		sum(
+			product(integer(2), symbol("x")),
+			product(rational(3, 2), symbol("x"))
+		),
+		product(rational(7, 2), symbol("x"))
+	);
+
+	test(
+		"x + 2x + 3x -> 6x",
+		sum(
+			symbol("x"),
+			product(integer(2), symbol("x")),
+			product(integer(3), symbol("x"))
+		),
+		product(integer(6), symbol("x"))
+	);
+
+	test(
+		"2x + y + (3/2)x -> (9/2)x + y",
+		sum(
+			product(integer(2), symbol("x")),
+			symbol("y"),
+			product(rational(3, 2), symbol("x"))
+		),
+		sum(
+			product(rational(7, 2), symbol("x")),
+			symbol("y")
+		)
+	);
+
+	//test(
+	//	"(a + (b + c)) + (-1)((a + b) + c)",
+	//	sum(
+	//		sum(
+	//			symbol("a"),
+	//			sum(symbol("b"), symbol("c"))
+	//		),
+	//		product(
+	//			integer(-1),
+	//			sum(
+	//				sum(symbol("a"), symbol("b")),
+	//				symbol("c")
+	//			)
+	//		)
+	//	),
+	//	integer(0)
+	//);
+
+	test(
+		"x3a -> 3ax",
+		product(symbol("x"), integer(3), symbol("a")),
+		product(integer(3), symbol("a"), symbol("x"))
+	);
+
+	test(
+		"xx^(-1) -> 1",
+		product(
+			symbol("x"),
+			power(symbol("x"), integer(-1))
+		),
+		integer(1)
+	);
+
+	test(
+		"2ace3bde -> 6abcde^2",
+		product(
+			integer(2), 
+			symbol("a"), 
+			symbol("c"), 
+			symbol("e"), 
+			integer(3), 
+			symbol("b"), 
+			symbol("d"), 
+			symbol("e")
+		),
+		product(
+			integer(6),
+			symbol("a"),
+			symbol("b"),
+			symbol("c"),
+			symbol("d"),
+			power(symbol("e"), integer(2))
+		)
+	);
+
+	test(
+		"a(bc) + (-1)(ab)c",
+		sum(
+			product(symbol("a"), product(symbol("b"), symbol("c"))),
+			product(
+				integer(-1), 
+				product(
+					product(symbol("a"), symbol("b")), 
+					symbol("c")
+				)
+			)
+		),
+		integer(0)
+	);
+
+	test(
+		"x x^2 x^3 -> x^6",
+		product(
+			symbol("x"),
+			power(symbol("x"), integer(2)),
+			power(symbol("x"), integer(3))
+		),
+		power(symbol("x"), integer(6))
+	);
+
+	test(
+		"(xy)(xy)^2 -> x^3 y^3",
+		product(
+			product(symbol("x"), symbol("y")),
+			power(product(symbol("x"), symbol("y")), integer(2))
+		),
+		product(power(symbol("x"), integer(3)), power(symbol("y"), integer(3)))
+	);
 
 	test(
 		"((x^(1/2))^(1/2))^8 -> x^(1/2)",

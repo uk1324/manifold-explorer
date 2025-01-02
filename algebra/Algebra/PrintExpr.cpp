@@ -3,13 +3,15 @@
 
 using namespace Algebra;
 
+void Algebra::debugPrintAlgebraicExprList(const AlgebraicExprList& list) {
+	putnn("[");
+	printAlgebraicExprList(list);
+	put("]");
+
+}
+
 void Algebra::printAlgebraicExprList(const AlgebraicExprList& list) {
-	for (i32 i = 0; i < list.size(); i++) {
-		Algebra::printAlgebraicExprNn(list[i]);
-		if (i != list.size() - 1) {
-			putnn(", ");
-		}
-	}
+	printAlgebraicExprView(constView(list));
 }
 
 void Algebra::printAlgebraicExprInternal(const AlgebraicExpr* expr) {
@@ -73,6 +75,15 @@ void Algebra::printAlgebraicExprNn(const std::unique_ptr<AlgebraicExpr>& expr) {
 void Algebra::printAlgebraicExpr(const std::unique_ptr<AlgebraicExpr>& expr) {
 	Algebra::printAlgebraicExprNn(expr);
 	put("");
+}
+
+void Algebra::printAlgebraicExprView(const View<const AlgebraicExprPtr>& view) {
+	for (i32 i = 0; i < view.size(); i++) {
+		Algebra::printAlgebraicExprNn(view[i]);
+		if (i != view.size() - 1) {
+			putnn(", ");
+		}
+	}
 }
 
 

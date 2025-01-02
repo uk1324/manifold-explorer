@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+	<Type Name="Algebra::AlgebraicExpr">
+		<DisplayString Condition="type == Algebra::AlgebraicExprType::SYMBOL">Symbol({((Algebra::SymbolExpr*)this)->name})</DisplayString>
+			<!--
+		<Expand>
+			<ExpandedItem>*((Algebra::SymbolExpr*)this)</ExpandedItem>
+			Using expanded item seems to have some issues with recursion.
+			Also I don't know why the string inside Algebra::SymbolExpr is not displayed even if it's just a variable of the type Algebra::SymbolExpr and not this visualization of Algebra::AlgebraicExpr
+			<Item Name="[value]">(Algebra::SymbolExpr*)this</Item>
+		</Expand>
+		Natvis errors can be displayed by going into tools > options > debuggin and there is an option to display the level of debugging.
+			<Item Name="[factors]">((Algebra::ProductExpr*)this)->factors</Item>
+			-->
+		<DisplayString Condition="type == Algebra::AlgebraicExprType::INTEGER">Integer({((Algebra::IntegerExpr*)this)->value})</DisplayString>
+		<DisplayString Condition="type == Algebra::AlgebraicExprType::RATIONAL">Rational({((Algebra::RationalExpr*)this)->numerator}, {((Algebra::RationalExpr*)this)->denominator})</DisplayString>
+		<DisplayString Condition="type == Algebra::AlgebraicExprType::PRODUCT">Product(...)</DisplayString>
+		<DisplayString Condition="type == Algebra::AlgebraicExprType::SUM">Sum(...)</DisplayString>
+		<DisplayString Condition="type == Algebra::AlgebraicExprType::POWER">Power(...)</DisplayString>
+		<Expand>
+			<ExpandedItem Condition="type == Algebra::AlgebraicExprType::PRODUCT">((Algebra::ProductExpr*)this)->factors</ExpandedItem>
+
+			<ExpandedItem Condition="type == Algebra::AlgebraicExprType::SUM">((Algebra::SumExpr*)this)->summands</ExpandedItem>
+			
+			<Item Condition="type == Algebra::AlgebraicExprType::POWER" Name="[base]">((Algebra::PowerExpr*)this)->base</Item>
+			<Item Condition="type == Algebra::AlgebraicExprType::POWER" Name="[exponent]">((Algebra::PowerExpr*)this)->exponent</Item>
+		</Expand>
+    </Type>
+</AutoVisualizer>
