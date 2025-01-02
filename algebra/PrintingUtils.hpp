@@ -3,7 +3,7 @@
 #pragma once
 
 #include <string_view>
-#include <span>
+#include <View.hpp>
 #include "Parsing/SourceInfo.hpp"
 
 #define TERMINAL_COLOR_RED "\x1B[31m"

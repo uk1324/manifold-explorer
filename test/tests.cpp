@@ -99,6 +99,7 @@ void parserErrorTests() {
 
 void parserTests() {
 	AstAllocator allocator;
+	using namespace Ast;
 
 	using enum BinaryOpType;
 	auto binary = [&](BinaryOpType type, Expr* lhs, Expr* rhs) {
@@ -110,8 +111,8 @@ void parserTests() {
 		return allocator.allocate<UnaryExpr>(operand, type, 0, 0);
 	};
 
-	auto constant = [&](FloatType value) {
-		return allocator.allocate<ConstantExpr>(value, 0, 0);
+	auto constant = [&](IntType numerator, IntType denominator = 1) {
+		return allocator.allocate<ConstantExpr>(numerator, denominator, 0, 0);
 	};
 
 	auto identifier = [&](std::string_view name) {
@@ -144,7 +145,6 @@ void parserTests() {
 			)
 		);
 	}
-
 	{
 		reset();
 		t.testParserOutput(
@@ -160,7 +160,6 @@ void parserTests() {
 			{ "x" }
 		);
 	}
-
 	{
 		reset();
 		t.testParserOutput(
@@ -206,7 +205,6 @@ void parserTests() {
 			{ "x", "y", "z" }
 		);
 	}
-
 	{
 		reset();
 		t.testParserOutput(
@@ -226,24 +224,23 @@ void parserTests() {
 			{ "x", "y", "a", "b" }
 		);
 	}
-
 	{
 		reset();
 		t.testParserOutput(
 			"x^a y^b -> (x^a)(y^b)",
 			"x^a y^b",
-			binary(MULTIPLY,
+				binary(MULTIPLY,
 				binary(EXPONENTIATE,
-					identifier("x"),
-					identifier("a")
+				identifier("x"),
+				identifier("a")
 				),
-				binary(EXPONENTIATE,
-					identifier("y"),
-					identifier("b")
-				)
-			),
+					binary(EXPONENTIATE,
+						identifier("y"),
+						identifier("b")
+					)
+				),
 			{ "x", "y", "a", "b" }
-		);
+			);
 	}
 	{
 		reset();
@@ -307,21 +304,196 @@ void parserTests() {
 				{ "a", "b", "c", "d" }
 			);
 		}
+		{
+			reset();
+			t.testParserOutput(
+				"x^y/z -> (x^y)/z",
+				"x^y/z",
+				binary(DIVIDE,
+					binary(EXPONENTIATE,
+						identifier("x"),
+						identifier("y")
+					),
+					identifier("z")
+				),
+				{ "x", "y", "z" }
+			);
+		}
 	}
+}
+
+#include <algebra/Algebra/Simplification.hpp>
+
+namespace AlgebraConstuctionHelpers {
+
+using namespace Algebra;
+
+
+AlgebraicExprPtr sum(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b) {
+	return std::make_unique<SumExpr>(std::move(a), std::move(b));
+}
+
+AlgebraicExprPtr sum(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b, AlgebraicExprPtr&& c) {
+	AlgebraicExprList list;
+	list.push_back(std::move(a));
+	list.push_back(std::move(b));
+	list.push_back(std::move(c));
+	return std::make_unique<SumExpr>(std::move(list));
+}
+
+AlgebraicExprPtr product(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b) {
+	return std::make_unique<ProductExpr>(std::move(a), std::move(b));
+}
+
+AlgebraicExprPtr product(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b, AlgebraicExprPtr&& c) {
+	AlgebraicExprList list;
+	list.push_back(std::move(a));
+	list.push_back(std::move(b));
+	list.push_back(std::move(c));
+	return std::make_unique<ProductExpr>(std::move(list));
+}
+
+AlgebraicExprPtr symbol(const char* symbol) {
+	return std::make_unique<SymbolExpr>(std::string(symbol));
+}
+
+AlgebraicExprPtr integer(IntegerType value) {
+	return std::make_unique<IntegerExpr>(value);
+}
+
+AlgebraicExprPtr rational(IntegerType numerator, IntegerType denominator) {
+	return std::make_unique<RationalExpr>(numerator, denominator);
+}
+
+AlgebraicExprPtr power(AlgebraicExprPtr&& base, AlgebraicExprPtr&& exponent) {
+	return std::make_unique<PowerExpr>(std::move(base), std::move(exponent));
+}
+
+}
+
+void algebraicExpressionLessThanTests() {
+	using namespace AlgebraConstuctionHelpers;
+
+	auto test = [](std::string_view name, const AlgebraicExprPtr& a, const AlgebraicExprPtr& b) {
+		if (algebraicExprLessThan(a, b)) {
+			t.printPassed(name);
+		} else {
+			t.printFailed(name);
+		}
+	};
+
+	test("2 < 5/2", integer(2), rational(5, 2));
+	test("a < b", symbol("a"), symbol("b"));
+	test("v1 < v2", symbol("v1"), symbol("v2"));
+	test("x1 < xa", symbol("x1"), symbol("xa"));
+
+	test(
+		"a + b < a + c",
+		sum(symbol("a"), symbol("b")),
+		sum(symbol("a"), symbol("c"))
+	);
+
+	// Comparasion is evaluated from right to left. The rightmost value is the most significand.
+	test(
+		"b + a < a + b",
+		sum(symbol("b"), symbol("a")),
+		sum(symbol("a"), symbol("b"))
+	);
+
+	test(
+		"a + c + d < b + c + d",
+		sum(symbol("a"), symbol("c"), symbol("d")),
+		sum(symbol("b"), symbol("c"), symbol("d"))
+	);
+
+	test(
+		"c + d < b + c + d",
+		sum(symbol("c"), symbol("d")),
+		sum(symbol("b"), symbol("c"), symbol("d"))
+	);
+
+	test(
+		"d + c + a < c + b",
+		sum(symbol("d"), symbol("c"), symbol("a")),
+		sum(symbol("c"), symbol("b"))
+	);
+
+	test(
+		"(1+x)^2 < (1+x)^3",
+		power(sum(integer(1), symbol("x")), integer(2)),
+		power(sum(integer(1), symbol("x")), integer(3))
+	);
+
+	test(
+		"(1+x)^3 < (1+y)^2",
+		power(sum(integer(1), symbol("x")), integer(3)),
+		power(sum(integer(1), symbol("y")), integer(2))
+	);
+
+}
+
+#include <Put.hpp>
+#include <algebra/Algebra/PrintExpr.hpp>
+#include <algebra/Algebra/Simplification.hpp>
+
+void algebraicExpressionSimplifyTests() {
+	using namespace AlgebraConstuctionHelpers;
+
+	auto test = [](std::string_view name, const AlgebraicExprPtr& toSimplify, const AlgebraicExprPtr& expected) {
+		const auto simplified = basicSimplifiy(toSimplify);
+		if (algebraicExprEquals(simplified, expected)) {
+			t.printPassed(name);
+		} else {
+			t.printFailed(name);
+			put("expected:");
+			printAlgebraicExpr(expected);
+			put("got:");
+			printAlgebraicExpr(simplified);
+		}
+	};
+
+	test(
+		"((x^(1/2))^(1/2))^8 -> x^(1/2)",
+		power(power(power(symbol("x"), rational(1, 2)), rational(1, 2)), integer(8)),
+		power(symbol("x"), integer(2))
+	);
+
+	test(
+		"((xy)^(1/2) z^2)^2 -> xyz^4",
+		power(
+			product(
+				power(product(symbol("x"), symbol("y")), rational(1, 2)),
+				power(symbol("z"), integer(2))
+			),
+			integer(2)
+		),
+		product(symbol("x"), symbol("y"), power(symbol("z"), integer(4)))
+	);
 }
 
 void debugMain();
 
 int main() {
-	scannerErrorTests();
-	scannerTests();
-	parserErrorTests();
-	parserTests();
+	bool debug = true;
+	debug = false;
+	if (debug) {
+		debugMain(); 
+	} else {
+		scannerErrorTests();
+		scannerTests();
+		parserErrorTests();
+		parserTests();
+		algebraicExpressionLessThanTests();
+		algebraicExpressionSimplifyTests();
+	}
 }
 
 #include <iostream>
 #include "Utils.hpp"
 #include <algebra/Parsing/AstPrint.hpp>
+#include <algebra/Algebra/PrintExpr.hpp>
+#include <algebra/Algebra/AstToExpr.hpp>
+#include <Put.hpp>
 
 void debugMain() {
 	Scanner scanner;
@@ -331,14 +503,17 @@ void debugMain() {
 
 	bool printTokens = true;
 	bool printAst = true;
+	bool printAlgebraicExpr = true;
 
-	std::string_view source;
-	std::vector<std::string> variables{ };
+	std::string_view source = "a^b/c";
+	std::vector<std::string> variables{ "a", "b", "c" };
 	std::vector<std::string> functions{ };
 
 	const auto& tokens = scanner.parse(source, constView(functions), constView(variables), scannerMessageHandler);
 	if (printTokens) {
+		put("Tokens:");
 		::printTokens(source, constView(tokens));
+		putnn("\n\n");
 	}
 
 	const auto ast = parser.parse(tokens, source, parserMessageHandler);
@@ -347,6 +522,19 @@ void debugMain() {
 	}
 
 	if (printAst) {
+		put("Ast:");
 		astPrint(*ast);
+		putnn("\n\n");
+	}
+
+	const auto algebraicExpr = astToExpr(*ast);
+	if (printAlgebraicExpr) {
+		put("Algebraic expression:");
+		Algebra::printAlgebraicExpr(algebraicExpr);
+		putnn("\n\n");
+
+		put("Algebraic expression using notation:");
+		Algebra::printAlgebraicExprUsingNotation(algebraicExpr);
+		putnn("\n\n");
 	}
 }

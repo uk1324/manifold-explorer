@@ -44,7 +44,7 @@ std::optional<const List<Token>&> TestRunner::tryTokenize(
 	return tokens;
 }
 
-std::optional<const Expr*> TestRunner::tryParse(
+std::optional<const Ast::Expr*> TestRunner::tryParse(
 	std::string_view name, 
 	std::string_view source,
 	const List<Token>& tokens, 
@@ -149,7 +149,7 @@ void TestRunner::reset() {
 	output.str("");
 }
 
-void TestRunner::testParserOutput(std::string_view name, std::string_view source, const Expr* expectedOutput, const std::vector<std::string>& variables, const std::vector<std::string>& functions) {
+void TestRunner::testParserOutput(std::string_view name, std::string_view source, const Ast::Expr* expectedOutput, const std::vector<std::string>& variables, const std::vector<std::string>& functions) {
 	reset();
 
 	auto tokens = tryTokenize(name, source, variables, functions);

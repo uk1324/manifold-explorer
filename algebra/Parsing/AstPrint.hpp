@@ -2,4 +2,4 @@
 
 #include "Ast.hpp"
 
-void astPrint(const Expr* expr);
+void astPrint(const Ast::Expr* expr);

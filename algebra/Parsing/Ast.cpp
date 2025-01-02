@@ -1,8 +1,11 @@
 #include "Ast.hpp"
 
-ConstantExpr::ConstantExpr(FloatType value, i64 start, i64 end)
+using namespace Ast;
+
+ConstantExpr::ConstantExpr(IntType numerator, IntType denominator, i64 start, i64 end)
 	: Expr(ExprType::CONSTANT, start, end)
-	, value(value) {}
+	, numerator(numerator)
+	, denominator(denominator) {}
 
 BinaryExpr::BinaryExpr(Expr* lhs, Expr* rhs, BinaryOpType op, i64 start, i64 end)
 	: Expr(ExprType::BINARY, start, end)

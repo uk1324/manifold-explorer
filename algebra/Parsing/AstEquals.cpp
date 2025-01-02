@@ -1,6 +1,8 @@
 #include "AstEquals.hpp"
 #include <Assertions.hpp>
 
+using namespace Ast;
+
 bool astEquals(const Expr* a, const Expr* b, bool compareLocations) {
 	if (a->type != b->type) {
 		return false;
@@ -15,7 +17,7 @@ bool astEquals(const Expr* a, const Expr* b, bool compareLocations) {
 	case CONSTANT: {
 		const auto x = static_cast<const ConstantExpr*>(a);
 		const auto y = static_cast<const ConstantExpr*>(b);
-		return x->value == y->value;
+		return x->numerator == y->numerator && x->denominator == y->denominator;
 	}
 	case BINARY: {
 		const auto x = static_cast<const BinaryExpr*>(a);

@@ -22,7 +22,7 @@ struct TestRunner {
 		const std::vector<std::string>& variables, 
 		const std::vector<std::string>& functions);
 
-	std::optional<const Expr*> tryParse(
+	std::optional<const Ast::Expr*> tryParse(
 		std::string_view name,
 		std::string_view source,
 		const List<Token>& tokens,
@@ -56,7 +56,7 @@ struct TestRunner {
 	void testParserOutput(
 		std::string_view name,
 		std::string_view source,
-		const Expr* expectedOutput,
+		const Ast::Expr* expectedOutput,
 		const std::vector<std::string>& variables = std::vector<std::string>(),
 		const std::vector<std::string>& functions = std::vector<std::string>());
 

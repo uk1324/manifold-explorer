@@ -31,6 +31,8 @@ const char* tokenTypeToStr(TokenType type) {
 	case TokenType::VARIABLE: return "VARIABLE";
 	case TokenType::FUNCTION: return "FUNCTION";
 	case TokenType::ERROR: return "ERROR";
+	case TokenType::WHITESPACE: return "WHITESPACE";
+	case TokenType::COMMA: return "COMMA";
 	}
 	ASSERT_NOT_REACHED();
 	return nullptr;

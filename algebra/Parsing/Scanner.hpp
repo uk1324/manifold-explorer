@@ -40,9 +40,6 @@ struct Scanner {
 	Token makeToken(TokenType type);
 	Token error(const ScannerError& error);
 
-	static bool isDigit(u8 c);
-	static bool isAlpha(u8 c);
-
 	List<Token> tokens;
 
 	i64 currentTokenStartIndex;

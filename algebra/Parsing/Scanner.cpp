@@ -1,5 +1,6 @@
 #include "Scanner.hpp"
 #include "../StringUtils.hpp"
+#include "CharUtils.hpp"
 #include <Assertions.hpp>
 #include <charconv>
 #include <optional>
@@ -214,12 +215,4 @@ Token Scanner::makeToken(TokenType type) {
 Token Scanner::error(const ScannerError& error) {
 	messageHandler->onError(error);
 	return makeToken(TokenType::ERROR);
-}
-
-bool Scanner::isDigit(u8 c) {
-	return c >= '0' && c <= '9';
-}
-
-bool Scanner::isAlpha(u8 c) {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }

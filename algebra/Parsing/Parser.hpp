@@ -18,26 +18,26 @@ struct Parser {
 		ParserMessageHandler* messageHandler);
 
 	// TODO: Use span.
-	std::optional<const Expr*> parse(
+	std::optional<const Ast::Expr*> parse(
 		const List<Token>& tokens,
 		std::string_view source,
 		ParserMessageHandler& messageHandler);
-	Expr* expr();
-	Expr* binaryExpr();
-	Expr* plusOrMinusBinaryExpr();
-	Expr* timesOrDivideBinaryExpr();
+	Ast::Expr* expr();
+	Ast::Expr* binaryExpr();
+	Ast::Expr* plusOrMinusBinaryExpr();
+	Ast::Expr* timesOrDivideBinaryExpr();
 	struct LhsOfBinaryExpr {
 		i64 start;
-		Expr* lhs;
-		BinaryOpType op;
+		Ast::Expr* lhs;
+		Ast::BinaryOpType op;
 	};
 	struct PrimaryExprResult {
-		Expr* expr;
+		Ast::Expr* expr;
 		bool absorbedLhs;
 	};
 	PrimaryExprResult primaryExpr(std::optional<LhsOfBinaryExpr> binaryExprLhs = std::nullopt);
-	Expr* exponentiationExpr(Expr* lhs, i64 start);
-	Expr* function(std::string_view name, i64 start);
+	Ast::Expr* exponentiationExpr(Ast::Expr* lhs, i64 start);
+	Ast::Expr* function(std::string_view name, i64 start);
 
 	const Token& peek();
 	const Token& peekPrevious();

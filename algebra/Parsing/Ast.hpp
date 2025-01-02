@@ -6,6 +6,8 @@
 
 // Using Expr* pointers instead of references to prevent bugs like writing auto x = someExpr() and then passing it into some struct. Which would leave a dangling reference. To fix this you would need to write auto&.
 
+namespace Ast {
+
 enum class ExprType {
 	CONSTANT,
 	BINARY,
@@ -20,12 +22,14 @@ struct Expr {
 	SourceLocation sourceLocation;
 };
 
-using FloatType = f64;
+//using FloatType = f64;
+using IntType = i64;
 
 struct ConstantExpr : public Expr {
-	ConstantExpr(FloatType value, i64 start, i64 end);
-
-	FloatType value;
+	ConstantExpr(IntType numerator, IntType denominator, i64 start, i64 end);
+	
+	IntType numerator;
+	IntType denominator;
 };
 
 enum class BinaryOpType {
@@ -66,3 +70,6 @@ struct FunctionExpr : public Expr {
 	std::string_view functionName;
 	std::span<const Expr* const> arguments;
 };
+
+
+}

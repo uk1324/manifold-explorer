@@ -2,4 +2,4 @@
 
 #include "Ast.hpp"
 
-bool astEquals(const Expr* a, const Expr* b, bool compareLocations);
+bool astEquals(const Ast::Expr* a, const Ast::Expr* b, bool compareLocations);

@@ -1,0 +1,28 @@
+const auto expr = exprPtr.get();
+switch (expr->type) {
+	using enum AlgebraicExprType;
+case INTEGER: {
+	const auto e = static_cast<const IntegerExpr*>(expr);
+}
+case RATIONAL: {
+	const auto e = static_cast<const RationalExpr*>(expr);
+}
+case VARIABLE: {
+	const auto e = static_cast<const VariableExpr*>(expr);
+}
+case FUNCTION: {
+	const auto e = static_cast<const FunctionExpr*>(expr);
+}
+case SUM: {
+	const auto e = static_cast<const SumExpr*>(expr);
+}
+case PRODUCT: {
+	const auto e = static_cast<const ProductExpr*>(expr);
+}
+case POWER: {
+	const auto e = static_cast<const PowerExpr*>(expr);
+}
+case UNDEFINED: {
+
+}
+}

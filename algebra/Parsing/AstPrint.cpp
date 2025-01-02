@@ -1,6 +1,8 @@
 #include "AstPrint.hpp"
 #include <Put.hpp>
 
+using namespace Ast;
+
 const char* binaryOpName(BinaryOpType op) {
 	switch (op) {
 		using enum BinaryOpType;
@@ -30,7 +32,7 @@ void astPrint(const Expr* expr) {
 
 	case CONSTANT: {
 		const auto e = static_cast<const ConstantExpr*>(expr);
-		putnn("Constant( % )", e->value);
+		putnn("Constant( %, % )", e->numerator, e->denominator);
 		return;
 	}
 	case BINARY: {

@@ -1,6 +1,9 @@
 #include "Parser.hpp"
 #include <Assertions.hpp>
 #include <charconv>
+#include "CharUtils.hpp"
+
+using namespace Ast;
 
 Parser::Parser() {
 	initialize(nullptr, std::string_view(), nullptr);
@@ -133,20 +136,36 @@ Parser::PrimaryExprResult Parser::primaryExpr(std::optional<LhsOfBinaryExpr> bin
 	if (match(TokenType::FLOAT)) {
 		const auto& numberToken = peekPrevious();
 		const auto numberTokenSource = tokenSource(numberToken);
-		FloatType value;
-		const auto result = std::from_chars(
-			numberTokenSource.data(),
-			numberTokenSource.data() + numberTokenSource.length(),
-			value
-		);
-		if (result.ec != std::errc()) {
-			// The scanner shouldn't have let throught a invalid number.
-			ASSERT_NOT_REACHED();
-			lhs = astAllocator.allocate<ConstantExpr>(1, numberToken.start(), numberToken.end());
-		} else {
-			lhs = astAllocator.allocate<ConstantExpr>(value, numberToken.start(), numberToken.end());
-			lhsStart = numberToken.start();
+
+		ASSERT(numberTokenSource.length() > 0);
+		IntType integerPart = 0;
+		IntType fractionalPartNumerator = 0;
+		IntType fractionalPartDenominator = 1;
+		bool parsingIntegerPart = true;
+		for (auto& c : numberTokenSource) {
+			if (isDigit(c)) {
+				const auto digit = c - '0';
+				if (parsingIntegerPart) {
+					integerPart *= 10;
+					integerPart += digit;
+				} else {
+					fractionalPartNumerator += digit;
+					fractionalPartDenominator *= 10;
+				}
+			} else if (c == '.') {
+				parsingIntegerPart = false;
+			} else {
+				ASSERT_NOT_REACHED();
+				lhs = astAllocator.allocate<ConstantExpr>(1, 1, numberToken.start(), numberToken.end());
+			}
 		}
+
+		lhs = astAllocator.allocate<ConstantExpr>(
+			integerPart * fractionalPartDenominator + fractionalPartNumerator, 
+			fractionalPartDenominator, 
+			numberToken.start(), 
+			numberToken.end());
+		lhsStart = numberToken.start();
 
 		if (match(TokenType::CARET)) {
 			return Parser::PrimaryExprResult{

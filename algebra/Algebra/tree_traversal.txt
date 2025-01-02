@@ -1,0 +1,15 @@
+In this application most of the time you want to first apply a transformation to the child nodes and only after transform the current node.
+Should things happen like this.
+
+Visit node
+Apply all transformations sequentially to each subnodes 
+Apply all transformations to current node
+
+or
+
+Visit each node and apply one transformation
+Visit each node and apply other transformation 
+and so on
+
+I think the second option is wrong, because it might miss some optimization on a single pass.
+if you were to apply.
