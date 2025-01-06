@@ -31,12 +31,12 @@ void Algebra::printAlgebraicExprInternal(const AlgebraicExpr* expr) {
 
 	case SYMBOL: {
 		const auto e = static_cast<const SymbolExpr*>(expr);
-		putnn("Symbol( \"%\" )", e->name);
+		putnn("Symbol( \"%\" )", e->symbol->name);
 		return;
 	}
 	case FUNCTION: {
 		const auto e = static_cast<const FunctionExpr*>(expr);
-		putnn("Function( \"%\", ", e->name);
+		putnn("Function( \"%\", ", e->function->name);
 		printAlgebraicExprList(e->arguments);
 		putnn(" )");
 		return;
@@ -114,12 +114,12 @@ void Algebra::printAlgebraicExprUsingNotation(const AlgebraicExprPtr& exprPtr) {
 
 	case SYMBOL: {
 		const auto e = static_cast<const SymbolExpr*>(expr);
-		putnn("%", e->name);
+		putnn("%", e->symbol->name);
 		return;
 	}
 	case FUNCTION: {
 		const auto e = static_cast<const FunctionExpr*>(expr);
-		putnn("%( ", e->name);
+		putnn("%( ", e->function->name);
 		printAlgebraicExprListUsingNotation(e->arguments, ", ");
 		putnn(" )");
 		return;

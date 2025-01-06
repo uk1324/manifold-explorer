@@ -1,4 +1,5 @@
 #include "TestRunner.hpp"
+#include <algebra/Algebra/ConstructionHelpers.hpp>
 
 TestRunner t;
 
@@ -323,59 +324,25 @@ void parserTests() {
 }
 
 #include <algebra/Algebra/Simplification.hpp>
+#include <algebra/Algebra/Context.hpp>
 
-namespace AlgebraConstuctionHelpers {
+namespace Symbols {
 
 using namespace Algebra;
 
-
-AlgebraicExprPtr sum(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b) {
-	return std::make_unique<SumExpr>(std::move(a), std::move(b));
-}
-
-AlgebraicExprPtr sum(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b, AlgebraicExprPtr&& c) {
-	AlgebraicExprList list;
-	list.push_back(std::move(a));
-	list.push_back(std::move(b));
-	list.push_back(std::move(c));
-	return std::make_unique<SumExpr>(std::move(list));
-}
-
-AlgebraicExprPtr product(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b) {
-	return std::make_unique<ProductExpr>(std::move(a), std::move(b));
-}
-
-AlgebraicExprPtr product(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b, AlgebraicExprPtr&& c) {
-	AlgebraicExprList list;
-	list.push_back(std::move(a));
-	list.push_back(std::move(b));
-	list.push_back(std::move(c));
-	return std::make_unique<ProductExpr>(std::move(list));
-}
-
-template <typename ...T>
-AlgebraicExprPtr product(T&&... args) {
-	AlgebraicExprList list;
-	//((std::cout << args << std::endl), ...);
-	((list.push_back(std::move(args))), ...);
-	return std::make_unique<ProductExpr>(std::move(list));
-}
-
-AlgebraicExprPtr symbol(const char* symbol) {
-	return std::make_unique<SymbolExpr>(std::string(symbol));
-}
-
-AlgebraicExprPtr integer(IntegerType value) {
-	return std::make_unique<IntegerExpr>(value);
-}
-
-AlgebraicExprPtr rational(IntegerType numerator, IntegerType denominator) {
-	return std::make_unique<RationalExpr>(numerator, denominator);
-}
-
-AlgebraicExprPtr power(AlgebraicExprPtr&& base, AlgebraicExprPtr&& exponent) {
-	return std::make_unique<PowerExpr>(std::move(base), std::move(exponent));
-}
+Context context;
+const auto a = VariableSymbol("a");
+const auto b = VariableSymbol("b");
+const auto c = VariableSymbol("c");
+const auto d = VariableSymbol("d");
+const auto e = VariableSymbol("e");
+const auto f = VariableSymbol("f");
+const auto x = VariableSymbol("x");
+const auto y = VariableSymbol("y");
+const auto z = VariableSymbol("z");
+const auto x1 = VariableSymbol("x1");
+const auto x2 = VariableSymbol("x2");
+const auto xa = VariableSymbol("xa");
 
 }
 
@@ -389,53 +356,54 @@ void algebraicExpressionLessThanTests() {
 			t.printFailed(name);
 		}
 	};
+	using namespace Symbols;
 
 	test("2 < 5/2", integer(2), rational(5, 2));
-	test("a < b", symbol("a"), symbol("b"));
-	test("v1 < v2", symbol("v1"), symbol("v2"));
-	test("x1 < xa", symbol("x1"), symbol("xa"));
+	test("a < b", symbol(a), symbol(b));
+	test("x1 < x2", symbol(x1), symbol(x2));
+	test("x1 < xa", symbol(x1), symbol(xa));
 
 	test(
 		"a + b < a + c",
-		sum(symbol("a"), symbol("b")),
-		sum(symbol("a"), symbol("c"))
+		sum(symbol(a), symbol(b)),
+		sum(symbol(a), symbol(c))
 	);
 
 	// Comparasion is evaluated from right to left. The rightmost value is the most significand.
 	test(
 		"b + a < a + b",
-		sum(symbol("b"), symbol("a")),
-		sum(symbol("a"), symbol("b"))
+		sum(symbol(b), symbol(a)),
+		sum(symbol(a), symbol(b))
 	);
 
 	test(
 		"a + c + d < b + c + d",
-		sum(symbol("a"), symbol("c"), symbol("d")),
-		sum(symbol("b"), symbol("c"), symbol("d"))
+		sum(symbol(a), symbol(c), symbol(d)),
+		sum(symbol(b), symbol(c), symbol(d))
 	);
 
 	test(
 		"c + d < b + c + d",
-		sum(symbol("c"), symbol("d")),
-		sum(symbol("b"), symbol("c"), symbol("d"))
+		sum(symbol(c), symbol(d)),
+		sum(symbol(b), symbol(c), symbol(d))
 	);
 
 	test(
 		"d + c + a < c + b",
-		sum(symbol("d"), symbol("c"), symbol("a")),
-		sum(symbol("c"), symbol("b"))
+		sum(symbol(d), symbol(c), symbol(a)),
+		sum(symbol(c), symbol(b))
 	);
 
 	test(
 		"(1+x)^2 < (1+x)^3",
-		power(sum(integer(1), symbol("x")), integer(2)),
-		power(sum(integer(1), symbol("x")), integer(3))
+		power(sum(integer(1), symbol(x)), integer(2)),
+		power(sum(integer(1), symbol(x)), integer(3))
 	);
 
 	test(
 		"(1+x)^3 < (1+y)^2",
-		power(sum(integer(1), symbol("x")), integer(3)),
-		power(sum(integer(1), symbol("y")), integer(2))
+		power(sum(integer(1), symbol(x)), integer(3)),
+		power(sum(integer(1), symbol(y)), integer(2))
 	);
 
 }
@@ -446,11 +414,11 @@ void algebraicExpressionLessThanTests() {
 
 void algebraicExpressionSimplifyTests() {
 	using namespace AlgebraConstuctionHelpers;
-
+	using namespace Symbols;
 	auto test = [](std::string_view name, const AlgebraicExprPtr& toSimplify, const AlgebraicExprPtr& expected) {
 		bool printInNotation = false;
 		printInNotation = true;
-		const auto simplified = basicSimplifiy(toSimplify);
+		const auto simplified = basicSimplifiy(context, toSimplify);
 		auto print = [&printInNotation](const AlgebraicExprPtr& expr) {
 			if (printInNotation) {
 				printAlgebraicExprUsingNotation(expr);
@@ -477,71 +445,71 @@ void algebraicExpressionSimplifyTests() {
 
 	test(
 		"x + (x + y)",
-		sum(symbol("x"), sum(symbol("x"), symbol("y"))),
-		sum(product(integer(2), symbol("x")), symbol("y"))
+		sum(symbol(x), sum(symbol(x), symbol(y))),
+		sum(product(integer(2), symbol(x)), symbol(y))
 	);
 
 	test(
 		"2x + (3/2)x -> (7/2)x",
 		sum(
-			product(integer(2), symbol("x")),
-			product(rational(3, 2), symbol("x"))
+			product(integer(2), symbol(x)),
+			product(rational(3, 2), symbol(x))
 		),
-		product(rational(7, 2), symbol("x"))
+		product(rational(7, 2), symbol(x))
 	);
 
 	test(
 		"x + 2x + 3x -> 6x",
 		sum(
-			symbol("x"),
-			product(integer(2), symbol("x")),
-			product(integer(3), symbol("x"))
+			symbol(x),
+			product(integer(2), symbol(x)),
+			product(integer(3), symbol(x))
 		),
-		product(integer(6), symbol("x"))
+		product(integer(6), symbol(x))
 	);
 
 	test(
 		"2x + y + (3/2)x -> (9/2)x + y",
 		sum(
-			product(integer(2), symbol("x")),
-			symbol("y"),
-			product(rational(3, 2), symbol("x"))
+			product(integer(2), symbol(x)),
+			symbol(y),
+			product(rational(3, 2), symbol(x))
 		),
 		sum(
-			product(rational(7, 2), symbol("x")),
-			symbol("y")
+			product(rational(7, 2), symbol(x)),
+			symbol(y)
 		)
 	);
 
-	//test(
-	//	"(a + (b + c)) + (-1)((a + b) + c)",
-	//	sum(
-	//		sum(
-	//			symbol("a"),
-	//			sum(symbol("b"), symbol("c"))
-	//		),
-	//		product(
-	//			integer(-1),
-	//			sum(
-	//				sum(symbol("a"), symbol("b")),
-	//				symbol("c")
-	//			)
-	//		)
-	//	),
-	//	integer(0)
-	//);
+	test(
+		"(a + (b + c)) + (-1)((a + b) + c)",
+		sum(
+			sum(
+				symbol(a),
+				sum(symbol(b), symbol(c))
+			),
+			product(
+				integer(-1),
+				sum(
+					sum(symbol(a), symbol(b)),
+					symbol(c)
+				)
+			)
+		),
+		integer(0)
+	);
 
 	test(
 		"x3a -> 3ax",
-		product(symbol("x"), integer(3), symbol("a")),
-		product(integer(3), symbol("a"), symbol("x"))
+		product(symbol(x), integer(3), symbol(a)),
+		product(integer(3), symbol(a), symbol(x))
 	);
 
 	test(
 		"xx^(-1) -> 1",
 		product(
-			symbol("x"),
-			power(symbol("x"), integer(-1))
+			symbol(x),
+			power(symbol(x), integer(-1))
 		),
 		integer(1)
 	);
@@ -550,33 +518,33 @@ void algebraicExpressionSimplifyTests() {
 		"2ace3bde -> 6abcde^2",
 		product(
 			integer(2), 
-			symbol("a"), 
-			symbol("c"), 
-			symbol("e"), 
+			symbol(a), 
+			symbol(c), 
+			symbol(e), 
 			integer(3), 
-			symbol("b"), 
-			symbol("d"), 
-			symbol("e")
+			symbol(b), 
+			symbol(d), 
+			symbol(e)
 		),
 		product(
 			integer(6),
-			symbol("a"),
-			symbol("b"),
-			symbol("c"),
-			symbol("d"),
-			power(symbol("e"), integer(2))
+			symbol(a),
+			symbol(b),
+			symbol(c),
+			symbol(d),
+			power(symbol(e), integer(2))
 		)
 	);
 
 	test(
 		"a(bc) + (-1)(ab)c",
 		sum(
-			product(symbol("a"), product(symbol("b"), symbol("c"))),
+			product(symbol(a), product(symbol(b), symbol(c))),
 			product(
 				integer(-1), 
 				product(
-					product(symbol("a"), symbol("b")), 
-					symbol("c")
+					product(symbol(a), symbol(b)), 
+					symbol(c)
 				)
 			)
 		),
@@ -586,39 +554,74 @@ void algebraicExpressionSimplifyTests() {
 	test(
 		"x x^2 x^3 -> x^6",
 		product(
-			symbol("x"),
-			power(symbol("x"), integer(2)),
-			power(symbol("x"), integer(3))
+			symbol(x),
+			power(symbol(x), integer(2)),
+			power(symbol(x), integer(3))
 		),
-		power(symbol("x"), integer(6))
+		power(symbol(x), integer(6))
 	);
 
 	test(
 		"(xy)(xy)^2 -> x^3 y^3",
 		product(
-			product(symbol("x"), symbol("y")),
-			power(product(symbol("x"), symbol("y")), integer(2))
+			product(symbol(x), symbol(y)),
+			power(product(symbol(x), symbol(y)), integer(2))
 		),
-		product(power(symbol("x"), integer(3)), power(symbol("y"), integer(3)))
+		product(power(symbol(x), integer(3)), power(symbol(y), integer(3)))
 	);
 
 	test(
 		"((x^(1/2))^(1/2))^8 -> x^(1/2)",
-		power(power(power(symbol("x"), rational(1, 2)), rational(1, 2)), integer(8)),
-		power(symbol("x"), integer(2))
+		power(power(power(symbol(x), rational(1, 2)), rational(1, 2)), integer(8)),
+		power(symbol(x), integer(2))
 	);
 
 	test(
 		"((xy)^(1/2) z^2)^2 -> xyz^4",
 		power(
 			product(
-				power(product(symbol("x"), symbol("y")), rational(1, 2)),
-				power(symbol("z"), integer(2))
+				power(product(symbol(x), symbol(y)), rational(1, 2)),
+				power(symbol(z), integer(2))
 			),
 			integer(2)
 		),
-		product(symbol("x"), symbol("y"), power(symbol("z"), integer(4)))
+		product(symbol(x), symbol(y), power(symbol(z), integer(4)))
 	);
+}
+
+void derivativeTests() {
+	using namespace AlgebraConstuctionHelpers;
+	using namespace Symbols;
+	auto test = [](std::string_view name, std::string_view source, const AlgebraicExprPtr& expected) {
+		const auto tokens = t.tryTokenize(name);
+
+		if ()
+		bool printInNotation = false;
+		printInNotation = true;
+		const auto simplified = basicSimplifiy(context, toSimplify);
+		auto print = [&printInNotation](const AlgebraicExprPtr& expr) {
+			if (printInNotation) {
+				printAlgebraicExprUsingNotation(expr);
+				put("");
+			} else {
+				printAlgebraicExpr(expr);
+			}
+		};
+
+		if (algebraicExprEquals(simplified, expected)) {
+			t.printPassed(name);
+		} else {
+			put("simplified :");
+			print(toSimplify);
+
+			t.printFailed(name);
+			put("expected:");
+			print(expected);
+			
+			put("got:");
+			print(simplified);
+		}
+	};
 }
 
 void debugMain();
@@ -635,6 +638,7 @@ int main() {
 		parserTests();
 		algebraicExpressionLessThanTests();
 		algebraicExpressionSimplifyTests();
+		derivativeTests();
 	}
 }
 
@@ -666,6 +670,7 @@ void debugMain() {
 		putnn("\n\n");
 	}
 
+
 	const auto ast = parser.parse(tokens, source, parserMessageHandler);
 	if (!ast.has_value()) {
 		return;
@@ -677,14 +682,20 @@ void debugMain() {
 		putnn("\n\n");
 	}
 
-	const auto algebraicExpr = astToExpr(*ast);
+	Algebra::Context context;
+	const auto algebraicExpr = astToExpr(context, *ast);
 	if (printAlgebraicExpr) {
-		put("Algebraic expression:");
-		Algebra::printAlgebraicExpr(algebraicExpr);
-		putnn("\n\n");
+		if (algebraicExpr.has_value()) {
+			put("Algebraic expression:");
+			Algebra::printAlgebraicExpr(*algebraicExpr);
+			putnn("\n\n");
 
-		put("Algebraic expression using notation:");
-		Algebra::printAlgebraicExprUsingNotation(algebraicExpr);
-		putnn("\n\n");
+			put("Algebraic expression using notation:");
+			Algebra::printAlgebraicExprUsingNotation(*algebraicExpr);
+			putnn("\n\n");
+		} else {
+			ASSERT_NOT_REACHED();
+		}
+		
 	}
 }

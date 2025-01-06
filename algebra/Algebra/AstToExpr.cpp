@@ -1,19 +1,36 @@
 #include "AstToExpr.hpp"
 #include <Assertions.hpp>
+#include "ConstructionHelpers.hpp"
+#include <optional>
 
-std::unique_ptr<Algebra::AlgebraicExpr> astToExpr(const Ast::Expr* expr) {
+#define TEST(expectedExpr) \
+	if (!expectedExpr.has_value()) { \
+		return expectedExpr; \
+	}
+
+#define CONVERT_BINARY_OP(operation) \
+	{ \
+		auto a = astToExpr(c, e->lhs); \
+		TEST(a); \
+		auto b = astToExpr(c, e->rhs); \
+		TEST(b); \
+		return operation(std::move(*a), std::move(*b)); \
+	}
+
+std::expected<Algebra::AlgebraicExprPtr, AstToExprError> astToExpr(const Algebra::Context& c, const Ast::Expr* expr) {
 	auto defaultValue = []() -> std::unique_ptr<Algebra::AlgebraicExpr> {
 		return std::make_unique<Algebra::IntegerExpr>(1);
 	};
+	using namespace AlgebraConstuctionHelpers;
 
 	switch (expr->type) {
 		using enum Ast::ExprType;
 	case CONSTANT: {
 		const auto e = static_cast<const Ast::ConstantExpr*>(expr);
 		if (e->denominator == 1) {
-			return std::make_unique<Algebra::IntegerExpr>(e->numerator);
+			return integer(e->numerator);
 		} else {
-			return std::make_unique<Algebra::RationalExpr>(e->numerator, e->denominator);
+			return rational(e->numerator, e->denominator);
 		}
 	}
 
@@ -21,32 +38,11 @@ std::unique_ptr<Algebra::AlgebraicExpr> astToExpr(const Ast::Expr* expr) {
 		const auto e = static_cast<const Ast::BinaryExpr*>(expr);
 		switch (e->op) {
 			using enum Ast::BinaryOpType;
-			case ADD: return std::make_unique<Algebra::SumExpr>(
-				astToExpr(e->lhs), 
-				astToExpr(e->rhs)
-			);
-			case SUBTRACT: return std::make_unique<Algebra::SumExpr>(
-				astToExpr(e->lhs),
-				std::make_unique<Algebra::ProductExpr>(
-					std::make_unique<Algebra::IntegerExpr>(-1),
-					astToExpr(e->rhs) 
-				)
-			);
-			case MULTIPLY: return std::make_unique<Algebra::ProductExpr>(
-				astToExpr(e->lhs), 
-				astToExpr(e->rhs)
-			);
-			case DIVIDE: return std::make_unique<Algebra::ProductExpr>(
-				astToExpr(e->lhs),
-				std::make_unique<Algebra::PowerExpr>(
-					astToExpr(e->rhs),
-					std::make_unique<Algebra::IntegerExpr>(-1)
-				)
-			);
-			case EXPONENTIATE: return std::make_unique<Algebra::PowerExpr>(
-				astToExpr(e->lhs), 
-				astToExpr(e->rhs)
-			);
+			case ADD: CONVERT_BINARY_OP(sum)
+			case SUBTRACT: CONVERT_BINARY_OP(difference)
+			case MULTIPLY: CONVERT_BINARY_OP(product)
+			case DIVIDE: CONVERT_BINARY_OP(division)
+			case EXPONENTIATE: CONVERT_BINARY_OP(power)
 			return defaultValue();
 		}
 	}
@@ -54,25 +50,37 @@ std::unique_ptr<Algebra::AlgebraicExpr> astToExpr(const Ast::Expr* expr) {
 		const auto e = static_cast<const Ast::UnaryExpr*>(expr);
 		switch (e->op) {
 			using enum Ast::UnaryOpType;
-		case NEGATE:
-			return std::make_unique<Algebra::ProductExpr>(
-				std::make_unique<Algebra::IntegerExpr>(-1),
-				astToExpr(e->operand) 
-			);
+		case NEGATE: {
+			auto o = astToExpr(c, e->operand);
+			TEST(o);
+			return negate(std::move(*o));
+		}
 		}
 		return defaultValue();
 	}
 	case IDENTIFIER: {
 		const auto e = static_cast<const Ast::IdentifierExpr*>(expr);
-		return std::make_unique<Algebra::SymbolExpr>(std::string(e->identifier));
+		for (const auto& s : c.symbols) {
+			if (s->name == e->identifier) {
+				return symbol(s);
+			}
+		}
+		return std::unexpected(AstToExprErrorUndefinedSymbol{ .symbolName = std::string(e->identifier) });
 	}
 	case FUNCTION:
 		const auto e = static_cast<const Ast::FunctionExpr*>(expr);
 		Algebra::AlgebraicExprList arguments;
 		for (const auto& argument : e->arguments) {
-			arguments.push_back(astToExpr(argument));
+			auto a = astToExpr(c, argument);
+			TEST(a);
+			arguments.push_back(std::move(*a));
 		}
-		return std::make_unique<Algebra::FunctionExpr>(std::string(e->functionName), std::move(arguments));
+		for (const auto& f : c.functions) {
+			if (f->name == e->functionName) {
+				return function(f, std::move(arguments));
+			}
+		}
+		return std::unexpected(AstToExprErrorUndefinedSymbol{ .symbolName = std::string(e->functionName) });
 	}
 	return defaultValue();
 }

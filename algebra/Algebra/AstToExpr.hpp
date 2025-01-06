@@ -1,6 +1,15 @@
 #pragma once
 
-#include "Expr.hpp"
 #include "../Parsing/Ast.hpp"
+#include "Context.hpp"
+#include "Expr.hpp"
+#include <expected>
+#include <variant>
 
-std::unique_ptr<Algebra::AlgebraicExpr> astToExpr(const Ast::Expr* expr);
+struct AstToExprErrorUndefinedSymbol {
+	std::string symbolName;
+};
+
+using AstToExprError = std::variant<AstToExprErrorUndefinedSymbol>;
+
+std::expected<Algebra::AlgebraicExprPtr, AstToExprError> astToExpr(const Algebra::Context& c, const Ast::Expr* expr);
