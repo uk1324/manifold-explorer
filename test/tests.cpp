@@ -287,62 +287,85 @@ void parserTests() {
 			),
 			{ "x", "y", "z" }
 		);
-		{
-			reset();
-			t.testParserOutput(
-				"a/b / c/d -> ((a/b)/c/d))",
-				"a/b / c/d",
+	}
+	{
+		reset();
+		t.testParserOutput(
+			"a/b / c/d -> ((a/b)/c/d))",
+			"a/b / c/d",
+			binary(DIVIDE,
 				binary(DIVIDE,
 					binary(DIVIDE,
-						binary(DIVIDE,
-							identifier("a"),
-							identifier("b")
-						),
-						identifier("c")
+						identifier("a"),
+						identifier("b")
 					),
-					identifier("d")
+					identifier("c")
 				),
-				{ "a", "b", "c", "d" }
-			);
-		}
-		{
-			reset();
-			t.testParserOutput(
-				"x^y/z -> (x^y)/z",
-				"x^y/z",
-				binary(DIVIDE,
-					binary(EXPONENTIATE,
-						identifier("x"),
-						identifier("y")
-					),
-					identifier("z")
+				identifier("d")
+			),
+			{ "a", "b", "c", "d" }
+		);
+	}
+	{
+		reset();
+		t.testParserOutput(
+			"x^y/z -> (x^y)/z",
+			"x^y/z",
+			binary(DIVIDE,
+				binary(EXPONENTIATE,
+					identifier("x"),
+					identifier("y")
 				),
-				{ "x", "y", "z" }
-			);
-		}
+				identifier("z")
+			),
+			{ "x", "y", "z" }
+		);
+	}
+	{
+		reset();
+		t.testParserOutput(
+			"1 2^x -> 1 * 2^x",
+			"1 2^x",
+			binary(MULTIPLY,
+				constant(1),
+				binary(EXPONENTIATE,
+					constant(2),
+					identifier("x")
+				)
+			),
+			{ "x" }
+		);
 	}
 }
 
 #include <algebra/Algebra/Simplification.hpp>
 #include <algebra/Algebra/Context.hpp>
+#include <list>
 
 namespace Symbols {
 
 using namespace Algebra;
 
-Context context;
-const auto a = VariableSymbol("a");
-const auto b = VariableSymbol("b");
-const auto c = VariableSymbol("c");
-const auto d = VariableSymbol("d");
-const auto e = VariableSymbol("e");
-const auto f = VariableSymbol("f");
-const auto x = VariableSymbol("x");
-const auto y = VariableSymbol("y");
-const auto z = VariableSymbol("z");
-const auto x1 = VariableSymbol("x1");
-const auto x2 = VariableSymbol("x2");
-const auto xa = VariableSymbol("xa");
+std::list<VariableSymbol> variables;
+Symbol* addVariable(std::string&& variableName) {
+	variables.push_back(VariableSymbol(std::move(variableName)));
+	auto ptr = &variables.back();
+	t.context.symbols.push_back(ptr);
+	return ptr;
+}
+
+const auto a = addVariable("a");
+const auto b = addVariable("b");
+const auto c = addVariable("c");
+const auto d = addVariable("d");
+const auto e = addVariable("e");
+const auto f = addVariable("f");
+const auto x = addVariable("x");
+const auto y = addVariable("y");
+const auto z = addVariable("z");
+const auto x1 = addVariable("x1");
+const auto x2 = addVariable("x2");
+const auto xa = addVariable("xa");
 
 }
 
@@ -350,7 +373,7 @@ void algebraicExpressionLessThanTests() {
 	using namespace AlgebraConstuctionHelpers;
 
 	auto test = [](std::string_view name, const AlgebraicExprPtr& a, const AlgebraicExprPtr& b) {
-		if (algebraicExprLessThan(a, b)) {
+		if (algebraicExprLessThan(t.context, a, b)) {
 			t.printPassed(name);
 		} else {
 			t.printFailed(name);
@@ -418,7 +441,7 @@ void algebraicExpressionSimplifyTests() {
 	auto test = [](std::string_view name, const AlgebraicExprPtr& toSimplify, const AlgebraicExprPtr& expected) {
 		bool printInNotation = false;
 		printInNotation = true;
-		const auto simplified = basicSimplifiy(context, toSimplify);
+		const auto simplified = basicSimplifiy(t.context, toSimplify);
 		auto print = [&printInNotation](const AlgebraicExprPtr& expr) {
 			if (printInNotation) {
 				printAlgebraicExprUsingNotation(expr);
@@ -589,40 +612,110 @@ void algebraicExpressionSimplifyTests() {
 	);
 }
 
+#include <algebra/Algebra/Derivative.hpp>
+
 void derivativeTests() {
 	using namespace AlgebraConstuctionHelpers;
 	using namespace Symbols;
-	auto test = [](std::string_view name, std::string_view source, const AlgebraicExprPtr& expected) {
-		const auto tokens = t.tryTokenize(name);
-
-		if ()
-		bool printInNotation = false;
-		printInNotation = true;
-		const auto simplified = basicSimplifiy(context, toSimplify);
-		auto print = [&printInNotation](const AlgebraicExprPtr& expr) {
-			if (printInNotation) {
-				printAlgebraicExprUsingNotation(expr);
-				put("");
-			} else {
-				printAlgebraicExpr(expr);
-			}
-		};
-
-		if (algebraicExprEquals(simplified, expected)) {
-			t.printPassed(name);
-		} else {
-			put("simplified :");
-			print(toSimplify);
-
-			t.printFailed(name);
-			put("expected:");
-			print(expected);
-			
-			put("got:");
-			print(simplified);
+	auto test = [](std::string_view name, const Symbol* symbol, std::string_view source, std::string_view expected) {
+		const auto gotExpr = t.tryCompileSourceToAlgebraicExpr(name, source);
+		if (!gotExpr.has_value()) {
+			return std::nullopt;
 		}
+		const auto expectedExpr = t.tryCompileSourceToAlgebraicExpr(name, expected);
+		if (!expectedExpr.has_value()) {
+			return std::nullopt;
+		}
+		const auto derivative = Algebra::derivative(t.context, Algebra::basicSimplifiy(t.context, *gotExpr), symbol);
+		t.expectedEquals(name, derivative, *expectedExpr);
 	};
+
+	test(
+		"D(x, x) = 1",
+		x,
+		"x",
+		"1"
+	);
+
+	test(
+		"D(y, x) = 0",
+		x,
+		"y",
+		"0"
+	);
+
+	test(
+		"D(sin(y + z^y), x) = 0",
+		x,
+		"sin(y + z^y)",
+		"0"
+	);
+
+	test(
+		"D(x^2, x) = 2x",
+		x,
+		"x^2",
+		"2x"
+	);
+
+	test(
+		"D(x^0, x) = 0",
+		x,
+		"x^0",
+		"0"
+	);
+
+	test(
+		"D(sin(x), x) = cos(x)",
+		x,
+		"sin(x)",
+		"cos(x)"
+	);
+
+	test(
+		"D(cos(x), x) = cos(x)",
+		x,
+		"cos(x)",
+		"-sin(x)"
+	);
+
+	test(
+		"D(ln(x), x) = 1/x",
+		x,
+		"ln(x)",
+		"1/x"
+	);
+
+	test(
+		"D(sin(cos(x)), x) = -cos(cos(x)) sin(x)",
+		x,
+		"sin(cos(x))",
+		"-cos(cos(x)) sin(x)"
+	);
+
+	test(
+		"D(e^x, x) = e^x",
+		x,
+		"e^x",
+		"e^x"
+	);
+
+	test(
+		"D(2^x, x) = ln(2) 2^x",
+		x,
+		"2^x",
+		"ln(2) 2^x"
+	);
+
+	test(
+		"D(x^(1/2) + x^(-1), x) = (1/2)x^(-1/2) -x^(-2)",
+		x,
+		"x^(1/2) + x^(-1)",
+		"(1/2)x^(-1/2) -x^(-2)"
+	);
 }
+
+#include <algebra/PrintingUtils.hpp>
 
 void debugMain();
 
@@ -639,6 +732,10 @@ int main() {
 		algebraicExpressionLessThanTests();
 		algebraicExpressionSimplifyTests();
 		derivativeTests();
+
+		if (t.failedTimes > 0) {
+			put(TERMINAL_COLOR_RED "Failed % tests." TERMINAL_COLOR_RESET, t.failedTimes);
+		}
 	}
 }
 
@@ -659,8 +756,8 @@ void debugMain() {
 	bool printAst = true;
 	bool printAlgebraicExpr = true;
 
-	std::string_view source = "a^b/c";
-	std::vector<std::string> variables{ "a", "b", "c" };
+	std::string_view source = "0^x";
+	std::vector<std::string> variables{ "a", "b", "c", "x" };
 	std::vector<std::string> functions{ };
 
 	const auto& tokens = scanner.parse(source, constView(functions), constView(variables), scannerMessageHandler);
@@ -683,19 +780,22 @@ void debugMain() {
 	}
 
 	Algebra::Context context;
-	const auto algebraicExpr = astToExpr(context, *ast);
-	if (printAlgebraicExpr) {
-		if (algebraicExpr.has_value()) {
-			put("Algebraic expression:");
-			Algebra::printAlgebraicExpr(*algebraicExpr);
-			putnn("\n\n");
-
-			put("Algebraic expression using notation:");
-			Algebra::printAlgebraicExprUsingNotation(*algebraicExpr);
-			putnn("\n\n");
-		} else {
-			ASSERT_NOT_REACHED();
-		}
-		
+	Algebra::VariableSymbol x("x");
+	context.symbols.push_back(&x);
+	auto optAlgebraicExpr = astToExpr(context, *ast);
+	if (!optAlgebraicExpr.has_value()) {
+		putAstToExprError(std::cerr, optAlgebraicExpr.error());
+		return;
 	}
+
+	auto e = std::move(*optAlgebraicExpr);
+	e = Algebra::derivative(context, Algebra::basicSimplifiy(context, e), &x);
+
+	put("Algebraic expression:");
+	Algebra::printAlgebraicExpr(e);
+	putnn("\n\n");
+
+	put("Algebraic expression using notation:");
+	Algebra::printAlgebraicExprUsingNotation(e);
+	putnn("\n\n");
 }

@@ -11,6 +11,8 @@ struct Context {
 	const Cos cos;
 	const Ln ln;
 
+	const EulersNumberSymbol e;
+
 	std::vector<const Function*> functions;
 
 	const UndefinedSymbol undefined;

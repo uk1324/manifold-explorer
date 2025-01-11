@@ -22,6 +22,7 @@ std::optional<AlgebraicExprPtr> algebraicExprBase(const Context& c, const Algebr
 		case RATIONAL:
 			return std::nullopt;
 
+		case DERIVATIVE: // A derivative could thechnically be a constant if it is not simplified fully.
 		case SYMBOL:
 		case FUNCTION:
 		case SUM:
@@ -50,6 +51,7 @@ std::optional<AlgebraicExprPtr> algebraicExprExponent(const Context& c, const Al
 	case FUNCTION:
 	case SUM:
 	case PRODUCT:
+	case DERIVATIVE:
 		return std::make_unique<IntegerExpr>(1);
 	case POWER: {
 		const auto e = static_cast<const PowerExpr*>(exprPtr.get());
@@ -70,6 +72,10 @@ bool algebraicExprListEquals(const AlgebraicExprList& a, const AlgebraicExprList
 		}
 	}
 	return true;
+}
+
+bool symbolEquals(const Symbol* a, const Symbol* b) {
+	return a == b;
 }
 
 bool Algebra::algebraicExprEquals(const AlgebraicExprPtr& aExprPtr, const AlgebraicExprPtr& bExprPtr) {
@@ -96,7 +102,7 @@ bool Algebra::algebraicExprEquals(const AlgebraicExprPtr& aExprPtr, const Algebr
 	case SYMBOL: {
 		const auto a = static_cast<const SymbolExpr*>(aExpr);
 		const auto b = static_cast<const SymbolExpr*>(bExpr);
-		return a->symbol == b->symbol;
+		return symbolEquals(a->symbol, b->symbol);
 	}
 	case FUNCTION: {
 		const auto a = static_cast<const FunctionExpr*>(aExpr);
@@ -122,13 +128,19 @@ bool Algebra::algebraicExprEquals(const AlgebraicExprPtr& aExprPtr, const Algebr
 		return algebraicExprEquals(a->base, b->base) &&
 			algebraicExprEquals(a->exponent, b->exponent);
 	}
+	case DERIVATIVE: {
+		const auto a = aExpr->asDerivative();
+		const auto b = bExpr->asDerivative();
+		return algebraicExprEquals(a->expr, b->expr) && symbolEquals(a->symbol, b->symbol);
+	}
+
 	}
 
 	CHECK_NOT_REACHED();
 	return false;
 }
 
-bool algebraicExprViewLessThan(View<const AlgebraicExprPtr> a, View<const AlgebraicExprPtr> b) {
+bool algebraicExprViewLessThan(const Context& c, View<const AlgebraicExprPtr> a, View<const AlgebraicExprPtr> b) {
 	for (i32 i = 0; ; i++) {
 		const auto aIndex = i64(a.size()) - 1 - i;
 		const auto bIndex = i64(b.size()) - 1 - i;
@@ -136,27 +148,37 @@ bool algebraicExprViewLessThan(View<const AlgebraicExprPtr> a, View<const Algebr
 			break;
 		}
 		if (!algebraicExprEquals(a[aIndex], b[bIndex])) {
-			return algebraicExprLessThan(a[aIndex], b[bIndex]);
+			return algebraicExprLessThan(c, a[aIndex], b[bIndex]);
 		}
 	}
 	return a.size() < b.size();
 }
 
-bool algebraicExprListLessThan(const AlgebraicExprList& a, const AlgebraicExprList& b) {
-	return algebraicExprViewLessThan(constView(a), constView(b));
+bool algebraicExprListLessThan(const Context& c, const AlgebraicExprList& a, const AlgebraicExprList& b) {
+	return algebraicExprViewLessThan(c, constView(a), constView(b));
 }
 
-bool algebraicExprPowerLessThan(const AlgebraicExprPtr& aBase, const AlgebraicExprPtr& aExponent,
+bool algebraicExprPowerLessThan(const Context& c, const AlgebraicExprPtr& aBase, const AlgebraicExprPtr& aExponent,
 	const AlgebraicExprPtr& bBase, const AlgebraicExprPtr& bExponent) {
 	if (algebraicExprEquals(aBase, bBase)) {
-		return algebraicExprLessThan(aExponent, bExponent);
+		return algebraicExprLessThan(c, aExponent, bExponent);
 	} else {
-		return algebraicExprLessThan(aBase, bBase);
+		return algebraicExprLessThan(c, aBase, bBase);
 	}
 }
 
+bool symbolLessThan(const Symbol* a, const Symbol* b) {
+	if (a->name != b->name) {
+		return a->name < b->name;
+	}
+	return intptr_t(a) < intptr_t(b);
+}
+
 // To make things more explicit could have each comparasion to have a separate function and return the function or it's negation.
-bool Algebra::algebraicExprLessThan(const AlgebraicExprPtr& aExprPtr, const AlgebraicExprPtr& bExprPtr) {
+bool Algebra::algebraicExprLessThan(const Context& c, const AlgebraicExprPtr& aExprPtr, const AlgebraicExprPtr& bExprPtr) {
+#define CASE_FUNCTION_LIKE \
+	case FUNCTION: \
+	case DERIVATIVE:
 	const auto aExpr = aExprPtr.get();
 	const auto bExpr = bExprPtr.get();
 
@@ -176,7 +198,7 @@ bool Algebra::algebraicExprLessThan(const AlgebraicExprPtr& aExprPtr, const Alge
 		}
 
 		case SYMBOL:
-		case FUNCTION:
+		CASE_FUNCTION_LIKE
 		case SUM:
 		case PRODUCT:
 		case POWER:
@@ -199,7 +221,7 @@ bool Algebra::algebraicExprLessThan(const AlgebraicExprPtr& aExprPtr, const Alge
 		}
 
 		case SYMBOL:
-		case FUNCTION:
+		CASE_FUNCTION_LIKE
 		case SUM:
 		case PRODUCT:
 		case POWER:
@@ -212,14 +234,11 @@ bool Algebra::algebraicExprLessThan(const AlgebraicExprPtr& aExprPtr, const Alge
 		switch (bExpr->type) {
 		case SYMBOL: {
 			const auto b = static_cast<const SymbolExpr*>(bExpr);
-			if (a->symbol->name != b->symbol->name) {
-				return a->symbol->name < b->symbol->name;
-			}
-			return intptr_t(a->symbol) < intptr_t(b->symbol);
+			return symbolLessThan(a->symbol, b->symbol);
 		}
 		case INTEGER: 
 		case RATIONAL: 
-		case FUNCTION:
+		CASE_FUNCTION_LIKE
 		case SUM:
 		case PRODUCT:
 		case POWER:
@@ -227,6 +246,14 @@ bool Algebra::algebraicExprLessThan(const AlgebraicExprPtr& aExprPtr, const Alge
 		}
 		break;
 	}
+#define FUNCTION_LIKE_BREAK \
+	case INTEGER: \
+	case RATIONAL: \
+	case SUM: \
+	case PRODUCT: \
+	case POWER: \
+	break;
+
 	case FUNCTION: {
 		const auto a = static_cast<const FunctionExpr*>(aExpr);
 		switch (bExpr->type) {
@@ -247,14 +274,39 @@ bool Algebra::algebraicExprLessThan(const AlgebraicExprPtr& aExprPtr, const Alge
 			if (a->function->type != b->function->type) {
 				return i32(a->function->type) < i32(b->function->type);
 			}
-			return algebraicExprListLessThan(a->arguments, b->arguments);
+			return algebraicExprListLessThan(c, a->arguments, b->arguments);
 		}
-		case INTEGER:
-		case RATIONAL:
-		case SUM:
-		case PRODUCT:
-		case POWER:
+		case DERIVATIVE: {
+			// FUNCTION < DERIVATIVE
+			const auto b = static_cast<const DerivativeExpr*>(bExpr);
+			const auto derivativeName = "D";
+			if (a->function->name != derivativeName) {
+				return a->function->name < derivativeName;
+			}
+			// @Performance: 
+			AlgebraicExprList arguments;
+			arguments.push_back(algebraicExprClone(c, b->expr));
+			arguments.push_back(std::make_unique<SymbolExpr>(b->symbol));
+			return algebraicExprListLessThan(c, a->arguments, arguments);
+		}
+		FUNCTION_LIKE_BREAK
+		}
+		break;
+	}
+	case DERIVATIVE: {
+		const auto a = aExpr->asDerivative();
+		switch (bExpr->type) {
+		case DERIVATIVE: {
+			const auto b = bExpr->asDerivative();
+			if (!symbolEquals(a->symbol, b->symbol)) {
+				return symbolLessThan(a->symbol, b->symbol);
+			}
+			return algebraicExprLessThan(c, a->expr, b->expr);
+		}
+		case SYMBOL:
+		case FUNCTION:
 			break;
+		FUNCTION_LIKE_BREAK
 		}
 		break;
 	}
@@ -263,11 +315,11 @@ bool Algebra::algebraicExprLessThan(const AlgebraicExprPtr& aExprPtr, const Alge
 		switch (bExpr->type) {
 		case SUM: {
 			const auto b = static_cast<const SumExpr*>(bExpr);
-			return algebraicExprListLessThan(a->summands, b->summands);
+			return algebraicExprListLessThan(c, a->summands, b->summands);
 		}
 		case SYMBOL:
-		case FUNCTION: 
-			return algebraicExprViewLessThan(constView(a->summands), constView(bExprPtr));
+		CASE_FUNCTION_LIKE
+			return algebraicExprViewLessThan(c, constView(a->summands), constView(bExprPtr));
 
 		case PRODUCT:
 		case POWER:
@@ -282,13 +334,13 @@ bool Algebra::algebraicExprLessThan(const AlgebraicExprPtr& aExprPtr, const Alge
 		switch (bExpr->type) {
 		case PRODUCT: {
 			const auto b = static_cast<const ProductExpr*>(bExpr);
-			return algebraicExprListLessThan(a->factors, b->factors);
+			return algebraicExprListLessThan(c, a->factors, b->factors);
 		}
 		case SYMBOL:
-		case FUNCTION:
+		CASE_FUNCTION_LIKE
 		case SUM:
 		case POWER:
-			return algebraicExprViewLessThan(constView(a->factors), constView(bExprPtr));
+			return algebraicExprViewLessThan(c, constView(a->factors), constView(bExprPtr));
 
 		case INTEGER:
 		case RATIONAL:
@@ -301,14 +353,14 @@ bool Algebra::algebraicExprLessThan(const AlgebraicExprPtr& aExprPtr, const Alge
 		switch (bExpr->type) {
 		case POWER: {
 			const auto b = static_cast<const PowerExpr*>(bExpr);
-			return algebraicExprPowerLessThan(a->base, a->exponent, b->base, b->exponent);
+			return algebraicExprPowerLessThan(c, a->base, a->exponent, b->base, b->exponent);
 		}
 
 		case SYMBOL:
-		case FUNCTION:
+		CASE_FUNCTION_LIKE
 		case SUM:
 			// @Performance: allocating. Could preallocate some constants for things like this.
-			return algebraicExprPowerLessThan(a->base, a->exponent, bExprPtr, std::make_unique<IntegerExpr>(1));
+			return algebraicExprPowerLessThan(c, a->base, a->exponent, bExprPtr, std::make_unique<IntegerExpr>(1));
 
 		case PRODUCT:
 		case INTEGER:
@@ -319,7 +371,11 @@ bool Algebra::algebraicExprLessThan(const AlgebraicExprPtr& aExprPtr, const Alge
 	}
 	}
 
-	return !algebraicExprLessThan(bExprPtr, aExprPtr);
+	if (algebraicExprEquals(aExprPtr, bExprPtr)) {
+		return false;
+	}
+
+	return !algebraicExprLessThan(c, bExprPtr, aExprPtr);
 }
 AlgebraicExprPtr basicSimplifyIntegerPower(const Context& c, const AlgebraicExprPtr& base, const AlgebraicExprPtr& integerExponent);
 
@@ -521,7 +577,7 @@ struct ConstantFactorDeomposition {
 	AlgebraicExpr nonConstantFactor;
 };
 
-bool isConstant(AlgebraicExprPtr& expr) {
+bool isConstant(const AlgebraicExprPtr& expr) {
 	return expr->isInteger() || expr->isRational();
 }
 
@@ -534,13 +590,20 @@ std::optional<AlgebraicExprPtr> algebraicExprConstantFactor(const Context& c, co
 
 	case SYMBOL:
 	case FUNCTION:
+	case DERIVATIVE:
 	case SUM:
 	case POWER:
 		return std::make_unique<IntegerExpr>(1);
 
 	case PRODUCT: {
 		const auto& e = expr->asProduct();
-		ASSERT(e->factors.size() >= 2);
+		// This is just used in the testing function.
+		if (e->factors.size() < 1) {
+			return algebraicExprClone(c, expr);
+		}
+		if (e->factors.size() < 2) {
+			return algebraicExprClone(c, e->factors[0]);
+		}
 		if (isConstant(e->factors[0])) {
 			// Simplified products always have the constant as the first factor.
 			return algebraicExprClone(c, e->factors[0]);
@@ -562,13 +625,22 @@ std::optional<AlgebraicExprPtr> algebraicExprNonConstantFactor(const Context& c,
 
 	case SYMBOL:
 	case FUNCTION:
+	case DERIVATIVE:
 	case SUM:
 	case POWER:
 		return algebraicExprClone(c, expr);
 
 	case PRODUCT: {
 		const auto& e = expr->asProduct();
-		ASSERT(e->factors.size() >= 2);
+
+		// This is just used in the testing function.
+		if (e->factors.size() < 1) {
+			return algebraicExprClone(c, expr);
+		}
+		if (e->factors.size() < 2) {
+			return algebraicExprClone(c, e->factors[0]);
+		}
+		
 		// Simplified products always have the constant as the first factor.
 		if (isConstant(e->factors[0])) {
 			if (e->factors.size() == 2) {
@@ -687,7 +759,7 @@ AlgebraicExprList basicSimplifySumRecursive(const Context& c, View<const Algebra
 		simplifiedSummands.push_back(std::move(simplifiedProduct));
 		return simplifiedSummands;
 	}
-	if (algebraicExprLessThan(b, a)) {
+	if (algebraicExprLessThan(c, b, a)) {
 		simplifiedSummands.push_back(algebraicExprClone(c, b));
 		simplifiedSummands.push_back(algebraicExprClone(c, a));
 		return simplifiedSummands;
@@ -910,7 +982,7 @@ AlgebraicExprList basicSimplifyProductRecursive(const Context& c, View<const Alg
 		simplifiedFactors.push_back(std::move(simplifiedPower));
 		return simplifiedFactors;
 	}
-	if (algebraicExprLessThan(b, a)) {
+	if (algebraicExprLessThan(c, b, a)) {
 		simplifiedFactors.push_back(algebraicExprClone(c, b));
 		simplifiedFactors.push_back(algebraicExprClone(c, a));
 		return simplifiedFactors;
@@ -1051,7 +1123,10 @@ AlgebraicExprPtr basicSimplifyIntegerPower(const Context& c, const AlgebraicExpr
 	return std::make_unique<PowerExpr>(algebraicExprClone(c, base), algebraicExprClone(c, integerExponent));
 }
 
+#include "ConstructionHelpers.hpp"
+
 AlgebraicExprPtr Algebra::basicSimplifiy(const Context& c, const AlgebraicExprPtr& exprPtr) {
+	using namespace AlgebraConstuctionHelpers;
 	const auto expr = exprPtr.get();
 	switch (expr->type) {
 		using enum AlgebraicExprType;
@@ -1086,10 +1161,28 @@ AlgebraicExprPtr Algebra::basicSimplifiy(const Context& c, const AlgebraicExprPt
 		return std::make_unique<SymbolExpr>(e->symbol);
 	}
 	case FUNCTION: {
-		const auto e = static_cast<const FunctionExpr*>(expr);
+		const auto e = expr->asFunction();
 		AlgebraicExprList arguments;
 		for (const auto& argument : e->arguments) {
 			arguments.push_back(basicSimplifiy(c, argument));
+		}
+		switch (e->function->type) {
+			using enum FunctionType;
+			case SIN:
+			case COS:
+				break;
+			case LN: {
+				if (arguments.size() != 1) {
+					ASSERT_NOT_REACHED();
+					break;
+				}
+				const auto& arg = arguments[0];
+				if (arg->isSymbol() && arg->asSymbol()->symbol->type == SymbolType::E) {
+					return integer(1);
+				}
+				break;
+			}
+
 		}
 		return std::make_unique<FunctionExpr>(e->function, std::move(arguments));
 	}
@@ -1102,8 +1195,154 @@ AlgebraicExprPtr Algebra::basicSimplifiy(const Context& c, const AlgebraicExprPt
 	case POWER: {
 		return basicSimplifyPower(c, exprPtr);
 	}
+	case DERIVATIVE: {
+		// TODO: Maybe just call derivative.
+		// Also collapsing multiple derivatives will need to be handled.
+		return algebraicExprClone(c, exprPtr);
+	}
 	}
 
 	ASSERT_NOT_REACHED();
 	return c.makeUndefined();
+}
+
+bool isSimplifiedExprList(const Context& c, const AlgebraicExprList& list, AlgebraicExprType listType) {
+	if (list.size() < 2) {
+		return false;
+	}
+	bool hasConstant = false;
+	for (const auto& e : list) {
+		if (!isSimplifiedExpr(c, e)) {
+			return false;
+		}
+		if (e->type == listType) {
+			// SR2 - nested sums and products not allowed
+			return false;
+		}
+		if (isConstant(e)) {
+			// SR1 - a simplified expression can only have one constant.
+			if (hasConstant) {
+				return false;
+			}
+			hasConstant = true;
+		}
+	}
+
+	for (i32 i = 1; i < list.size(); i++) {
+		const auto& a = list[i - 1];
+		const auto& b = list[i];
+		if (!algebraicExprLessThan(c, a, b)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool Algebra::isSimplifiedExpr(const Context& c, const AlgebraicExprPtr& expr) {
+	switch (expr->type) {
+		using enum AlgebraicExprType;
+	case INTEGER: return true;
+	case RATIONAL: {
+		const auto e = expr->asRational();
+		return isRationalNumberInCanonicalForm(e->numerator, e->denominator);
+	}
+	case SYMBOL: {
+		const auto e = expr->asSymbol();
+		if (e->isUndefined()) {
+			return false;
+		}
+		return true;
+	}
+	case FUNCTION: {
+		const auto e = expr->asFunction();
+		for (const auto& a : e->arguments) {
+			if (!isSimplifiedExpr(c, a)) {
+				return false;
+			}
+		}
+		return true;
+	}
+	case SUM: {
+		const auto e = expr->asSum();
+		if (!isSimplifiedExprList(c, e->summands, e->type)) {
+			return false;
+		}
+
+		for (i32 i = 0; i < e->summands.size(); i++) {
+			const auto& a = e->summands[i];
+			for (i32 j = i + 1; j < e->summands.size(); j++) {
+				const auto& b = e->summands[j];
+				const auto aTerm = algebraicExprNonConstantFactor(c, a);
+				if (!aTerm.has_value()) {
+					continue;
+				}
+				const auto bTerm = algebraicExprConstantFactor(c, b);
+				if (!bTerm.has_value()) {
+					continue;
+				}
+				if (algebraicExprEquals(*aTerm, *bTerm)) {
+					// SR4 - sums with common terms are combined.
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+	case PRODUCT: {
+		const auto e = expr->asProduct();
+		if (!isSimplifiedExprList(c, e->factors, e->type)) {
+			return false;
+		}
+		for (i32 i = 0; i < e->factors.size(); i++) {
+			const auto& a = e->factors[i];
+			for (i32 j = i + 1; j < e->factors.size(); j++) {
+				const auto& b = e->factors[j];
+				const auto aBase = algebraicExprBase(c, a);
+				if (!aBase.has_value()) {
+					continue;
+				}
+				const auto bBase = algebraicExprBase(c, b);
+				if (!bBase.has_value()) {
+					continue;
+				}
+				if (algebraicExprEquals(*aBase, *bBase)) {
+					// SR3 - products with common factors must be combined
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+	case POWER: {
+		const auto e = expr->asPower(); 
+		const auto& b = e->base;
+		const auto& p = e->exponent;
+		if (!isSimplifiedExpr(c, e->exponent)) {
+			return false;
+		}
+		if (!isSimplifiedExpr(c, e->base)) {
+			return false;
+		}
+		if (e->exponent->isIntegerValue(0) || e->exponent->isIntegerValue(1)) {
+			return false;
+		}
+		if (e->base->isInteger()) {
+			if (!(b->isSymbol() || b->isSum() || b->isFunction() || b->isDerivative())) {
+				return false;
+			}
+		} else {
+			if (b->isIntegerValue(0) || b->isIntegerValue(1)) {
+				return false;
+			}
+		}
+		return true;
+	}
+	case DERIVATIVE: {
+		const auto e = expr->asDerivative();
+		return isSimplifiedExpr(c, e->expr);
+	}
+	}
+	ASSERT_NOT_REACHED();
+	return false;
 }

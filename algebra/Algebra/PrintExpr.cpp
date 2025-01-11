@@ -64,6 +64,15 @@ void Algebra::printAlgebraicExprInternal(const AlgebraicExpr* expr) {
 		putnn(" )");
 		return;
 	}
+	case DERIVATIVE: {
+		const auto e = expr->asDerivative();
+		putnn("Derivative( ");
+		printAlgebraicExprNn(e->expr);
+		putnn(", ");
+		putnn("%", e->symbol->name);
+		putnn(" )");
+	}
+
 	}
 	ASSERT_NOT_REACHED();
 }
@@ -147,6 +156,15 @@ void Algebra::printAlgebraicExprUsingNotation(const AlgebraicExprPtr& exprPtr) {
 		putnn(" )");
 		return;
 	}
+
+	case DERIVATIVE: {
+		const auto e = expr->asDerivative();
+		putnn("D( ");
+		printAlgebraicExprUsingNotation(exprPtr);
+		putnn(", % )", e->symbol->name);
+		return;
+	}
+
 	}
 	ASSERT_NOT_REACHED();
 }

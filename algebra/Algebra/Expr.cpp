@@ -44,6 +44,10 @@ bool Algebra::AlgebraicExpr::isFunction() const {
 	return type == AlgebraicExprType::FUNCTION;
 }
 
+bool Algebra::AlgebraicExpr::isDerivative() const {
+	return type == AlgebraicExprType::DERIVATIVE;
+}
+
 const IntegerExpr* Algebra::AlgebraicExpr::asInteger() const {
 	ASSERT(isInteger());
 	return static_cast<const IntegerExpr*>(this);
@@ -99,6 +103,15 @@ FunctionExpr* Algebra::AlgebraicExpr::asFunction() {
 	return static_cast<FunctionExpr*>(this);
 }
 
+const DerivativeExpr* Algebra::AlgebraicExpr::asDerivative() const {
+	return const_cast<AlgebraicExpr*>(this)->asDerivative();
+}
+
+DerivativeExpr* Algebra::AlgebraicExpr::asDerivative() {
+	ASSERT(isDerivative());
+	return static_cast<DerivativeExpr*>(this);
+}
+
 bool algebraicExprListFreeOfVariable(const AlgebraicExprList& list, const Symbol* symbol) {
 	for (const auto& a : list) {
 		if (!a->isFreeOfVariable(symbol)) {
@@ -108,9 +121,9 @@ bool algebraicExprListFreeOfVariable(const AlgebraicExprList& list, const Symbol
 	return true;
 }
 
-bool Algebra::AlgebraicExpr::isFreeOfVariable(const Symbol* variable) const {
+bool AlgebraicExpr::isFreeOfVariable(const Symbol* variable) const {
 	switch (type) {
-		using enum Algebra::AlgebraicExprType;
+		using enum AlgebraicExprType;
 	case INTEGER:
 	case RATIONAL:
 		return true;
@@ -132,9 +145,17 @@ bool Algebra::AlgebraicExpr::isFreeOfVariable(const Symbol* variable) const {
 		const auto e = asProduct();
 		return algebraicExprListFreeOfVariable(e->factors, variable);
 	}
-	case POWER:
+	case POWER: {
 		const auto e = asPower();
 		return e->base->isFreeOfVariable(variable) && e->exponent->isFreeOfVariable(variable);
+	}
+
+	case DERIVATIVE: {
+		const auto e = asDerivative();
+		// The symbol doesn't have to be free of the variable for example Derivative(1, x) is free of x.
+		return e->expr->isFreeOfVariable(variable);
+	}
+
 	}
 	return false;
 }
@@ -153,6 +174,9 @@ UndefinedSymbol::UndefinedSymbol()
 
 VariableSymbol::VariableSymbol(std::string&& name) 
 	: Symbol(SymbolType::VARIABLE, std::move(name)) {}
+
+EulersNumberSymbol::EulersNumberSymbol() 
+	: Symbol(SymbolType::E, "e") {}
 
 IntegerExpr::IntegerExpr(IntegerType value)
 	: AlgebraicExpr(AlgebraicExprType::INTEGER) 
@@ -202,6 +226,11 @@ AlgebraicExprPtr Algebra::PowerExpr::clone(const Context& c) const {
 	return std::make_unique<PowerExpr>(algebraicExprClone(c, base), algebraicExprClone(c, exponent));
 }
 
+DerivativeExpr::DerivativeExpr(AlgebraicExprPtr&& expr, const Symbol* symbol) 
+	: AlgebraicExpr(AlgebraicExprType::DERIVATIVE)
+	, expr(std::move(expr))
+	, symbol(symbol) {}
+
 AlgebraicExprList Algebra::algebraicExprListClone(const Context& c, const AlgebraicExprList& list) {
 	AlgebraicExprList output;
 	for (const auto& expr : list) {
@@ -240,6 +269,10 @@ AlgebraicExprPtr Algebra::algebraicExprClone(const Context& c, const AlgebraicEx
 	}
 	case POWER: {
 		return expr->asPower()->clone(c);
+	}
+	case DERIVATIVE: {
+		const auto e = expr->asDerivative();
+		return std::make_unique<DerivativeExpr>(algebraicExprClone(c, e->expr), e->symbol);
 	}
 	}
 

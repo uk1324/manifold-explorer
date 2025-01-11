@@ -1,5 +1,7 @@
 #include "AstToExpr.hpp"
 #include <Assertions.hpp>
+#include <Put.hpp>
+#include <Overloaded.hpp>
 #include "ConstructionHelpers.hpp"
 #include <optional>
 
@@ -16,6 +18,14 @@
 		TEST(b); \
 		return operation(std::move(*a), std::move(*b)); \
 	}
+
+void putAstToExprError(std::ostream& os, const AstToExprError& error) {
+	std::visit(overloaded{
+		[&](const AstToExprErrorUndefinedSymbol& e) {
+			put(os, "Undefined symbol %.", e.symbolName);
+		}
+	}, error);
+}
 
 std::expected<Algebra::AlgebraicExprPtr, AstToExprError> astToExpr(const Algebra::Context& c, const Ast::Expr* expr) {
 	auto defaultValue = []() -> std::unique_ptr<Algebra::AlgebraicExpr> {

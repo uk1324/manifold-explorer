@@ -13,6 +13,7 @@ Algebra::Context::Context()
 	functions.push_back(&ln);
 
 	symbols.push_back(&undefined);
+	symbols.push_back(&e);
 }
 
 AlgebraicExprPtr Algebra::Context::makeUndefined() const {

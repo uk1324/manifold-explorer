@@ -11,6 +11,12 @@ AlgebraicExprPtr Algebra::derivative(Context& c, const AlgebraicExprPtr& expr, c
 	return basicSimplifiy(c, derivativeUnsimplified(c, expr, variable));
 }
 
+/*
+Initially I thought about making a derivative a new function. But it is probably better to derivatives of expressions rather than functions. If you just implemented derivatvies of functions that you couldn't for example have a derivative of an integral which can't always be evaluated. This would require having 2 different kinds of derivatives.
+Also there would be an issue with naming the parameters to a function. Technically a function doesn't need to have any names for the inputs it could be just considered as a set of pairs of inputs and outputs. If expressions are used instead of functions then there is no such issue.
+So in summary there is
+Derivative(f(x), x) not Derivative(f, 0)(x). Where 0 is the argument index.
+*/
 AlgebraicExprPtr Algebra::derivativeUnsimplified(Context& c, const AlgebraicExprPtr& expr, const Symbol* variable) {
 	using namespace AlgebraConstuctionHelpers;
 	if (expr->isSymbol()) {
@@ -23,9 +29,22 @@ AlgebraicExprPtr Algebra::derivativeUnsimplified(Context& c, const AlgebraicExpr
 	if (expr->isPower()) {
 		// d(a^b)/dx = d(pow(a, b))/dx = 
 		//		b * pow(a, b-1) * da/dx + // Holding b constant
-		//		ln(b) * pow(a, b) * db/dx // Holding a constant
+		//		ln(a) * pow(a, b) * db/dx // Holding a constant
+		// TODO: The derivative of 0^x is undefined for all x. 
+		// 0^x = 
+		//	if x = 0 then 1 
+		//	else if x > 0 then 0
+		//	else undefined
+		// So the derivative should be defined on (0, +inf).
+		// In sympy diff(Rational(0)**x, x) = nan
+		// Wolfram alpha gives the correct values for (0^x)', but fails for ((sin(x)^2 + cos(x)^2 - 1)^x)'.
+
+		/*
+		expr can't be equal to x^0 because the expression is in simplified form. TODO: Write which rule this uses.
+		Also the simplified version of 0 * x^(0 - 1) is zero. The only issue is that the domain changes.
+		*/
 		const auto e = expr->asPower();
-		// @Performance: Could handle specific cases when base or exponent don't depend on the variable.
+		// @Performance: Could handle specific cases when base or exponent don't depend on the variable. This might lead to more code execution, but would do less allocation.
 		return sum(
 			product(
 				algebraicExprClone(c, e->exponent),
@@ -98,24 +117,28 @@ AlgebraicExprPtr Algebra::derivativeUnsimplified(Context& c, const AlgebraicExpr
 		const auto fn = functionExpr->function;
 		const auto& arguments = functionExpr->arguments;
 		auto argumentDerivative = derivative(c, algebraicExprClone(c, arguments[0]), variable);
-		if (fn == &c.sin) {
+		switch (fn->type) {
+			using enum FunctionType;
+		case SIN: {
 			return product(
 				function(c.cos, algebraicExprClone(c, arguments[0])),
 				std::move(argumentDerivative)
 			);
-		} 
-		if (fn == &c.cos) {
+		}
+		case COS: {
 			return product(
 				integer(-1),
 				function(c.sin, algebraicExprClone(c, arguments[0])),
 				std::move(argumentDerivative)
 			);
 		}
-		if (fn == &c.ln) {
+		case LN: {
 			return power(
 				algebraicExprClone(c, arguments[0]),
 				integer(-1)
 			);
+		}
+
 		}
 		ASSERT_NOT_REACHED();
 		return c.makeUndefined();
@@ -125,5 +148,5 @@ AlgebraicExprPtr Algebra::derivativeUnsimplified(Context& c, const AlgebraicExpr
 		return integer(0);
 	}
 	
-	return c.makeUndefined();
+	return std::make_unique<DerivativeExpr>(algebraicExprClone(c, expr), variable);
 }

@@ -33,6 +33,11 @@ T integerGcd(T a, T b) {
 }
 
 template<typename T>
+bool isRationalNumberInCanonicalForm(T numerator, T denominator) {
+	return denominator > 0 && integerGcd(numerator, denominator) == 1;
+}
+
+template<typename T>
 T rationalInCanonicalFormLessThan(T aNumerator, T aDenominator, T bNumerator, T bDenominator) {
 	return aNumerator * bDenominator < bNumerator * aDenominator;
 }
@@ -48,7 +53,7 @@ T integerToNonNegativePower(T base, T power) {
 		const auto v = integerToNonNegativePower(base, power / 2);
 		return v * v;
 	} else {
-		return integerToNonNegativePower(base, power - 1);
+		return base * integerToNonNegativePower(base, power - 1);
 	}
 }
 

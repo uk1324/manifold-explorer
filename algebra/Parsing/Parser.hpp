@@ -38,6 +38,7 @@ struct Parser {
 	PrimaryExprResult primaryExpr(std::optional<LhsOfBinaryExpr> binaryExprLhs = std::nullopt);
 	Ast::Expr* exponentiationExpr(Ast::Expr* lhs, i64 start);
 	Ast::Expr* function(std::string_view name, i64 start);
+	Ast::Expr* number();
 
 	const Token& peek();
 	const Token& peekPrevious();

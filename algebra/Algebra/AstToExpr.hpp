@@ -12,4 +12,6 @@ struct AstToExprErrorUndefinedSymbol {
 
 using AstToExprError = std::variant<AstToExprErrorUndefinedSymbol>;
 
+void putAstToExprError(std::ostream& os, const AstToExprError& error);
+
 std::expected<Algebra::AlgebraicExprPtr, AstToExprError> astToExpr(const Algebra::Context& c, const Ast::Expr* expr);

@@ -1,5 +1,6 @@
 #include "Parser.hpp"
 #include <Assertions.hpp>
+#include <Put.hpp>
 #include <charconv>
 #include "CharUtils.hpp"
 
@@ -135,36 +136,7 @@ Parser::PrimaryExprResult Parser::primaryExpr(std::optional<LhsOfBinaryExpr> bin
 	bool absorbedLhs = false;
 	if (match(TokenType::FLOAT)) {
 		const auto& numberToken = peekPrevious();
-		const auto numberTokenSource = tokenSource(numberToken);
-
-		ASSERT(numberTokenSource.length() > 0);
-		IntType integerPart = 0;
-		IntType fractionalPartNumerator = 0;
-		IntType fractionalPartDenominator = 1;
-		bool parsingIntegerPart = true;
-		for (auto& c : numberTokenSource) {
-			if (isDigit(c)) {
-				const auto digit = c - '0';
-				if (parsingIntegerPart) {
-					integerPart *= 10;
-					integerPart += digit;
-				} else {
-					fractionalPartNumerator += digit;
-					fractionalPartDenominator *= 10;
-				}
-			} else if (c == '.') {
-				parsingIntegerPart = false;
-			} else {
-				ASSERT_NOT_REACHED();
-				lhs = astAllocator.allocate<ConstantExpr>(1, 1, numberToken.start(), numberToken.end());
-			}
-		}
-
-		lhs = astAllocator.allocate<ConstantExpr>(
-			integerPart * fractionalPartDenominator + fractionalPartNumerator, 
-			fractionalPartDenominator, 
-			numberToken.start(), 
-			numberToken.end());
+		lhs = number();
 		lhsStart = numberToken.start();
 
 		if (match(TokenType::CARET)) {
@@ -255,7 +227,7 @@ Parser::PrimaryExprResult Parser::primaryExpr(std::optional<LhsOfBinaryExpr> bin
 			// a/a^b c d = 
 			binaryExprLhs = std::nullopt;
 			continue;
-		} if (match(TokenType::VARIABLE)) {
+		} else if (match(TokenType::VARIABLE)) {
 			const auto& identifierToken = peekPrevious();
 			const auto identifier = tokenSource(identifierToken);
 			const auto start = identifierToken.start();
@@ -265,6 +237,11 @@ Parser::PrimaryExprResult Parser::primaryExpr(std::optional<LhsOfBinaryExpr> bin
 				start,
 				identifierToken.end());
 			rhsEnd = identifierToken.end();
+		} else if (match(TokenType::FLOAT)) {
+			const auto& numberToken = peekPrevious();
+			rhsStart = numberToken.start();
+			rhsEnd = numberToken.end();
+			rhs = number();
 		} else if (match(TokenType::FUNCTION)) {
 			rhsStart = peekPrevious().start();
 			rhs = function(tokenSource(peekPrevious()), rhsStart);
@@ -320,6 +297,40 @@ Expr* Parser::function(std::string_view name, i64 start) {
 	return astAllocator.allocate<FunctionExpr>(name, arguments.span(), start, peek().end());
 }
 
+Expr* Parser::number() {
+	const auto& numberToken = peekPrevious();
+	const auto numberTokenSource = tokenSource(numberToken);
+
+	ASSERT(numberTokenSource.length() > 0);
+	IntType integerPart = 0;
+	IntType fractionalPartNumerator = 0;
+	IntType fractionalPartDenominator = 1;
+	bool parsingIntegerPart = true;
+	for (auto& c : numberTokenSource) {
+		if (isDigit(c)) {
+			const auto digit = c - '0';
+			if (parsingIntegerPart) {
+				integerPart *= 10;
+				integerPart += digit;
+			} else {
+				fractionalPartNumerator += digit;
+				fractionalPartDenominator *= 10;
+			}
+		} else if (c == '.') {
+			parsingIntegerPart = false;
+		} else {
+			ASSERT_NOT_REACHED();
+			return astAllocator.allocate<ConstantExpr>(1, 1, numberToken.start(), numberToken.end());
+		}
+	}
+
+	return astAllocator.allocate<ConstantExpr>(
+		integerPart * fractionalPartDenominator + fractionalPartNumerator,
+		fractionalPartDenominator,
+		numberToken.start(),
+		numberToken.end());
+}
+
 const Token& Parser::peek() {
 	ASSERT(currentTokenIndex >= 0);
 	return (*tokens)[static_cast<usize>(currentTokenIndex)];
@@ -362,6 +373,7 @@ void Parser::expect(TokenType type) {
 
 void Parser::advance() {
 	ASSERT(currentTokenIndex >= 0);
+	//put("%", tokenTypeToStr((*tokens)[currentTokenIndex].type));
 	if ((*tokens)[static_cast<usize>(currentTokenIndex)].type == TokenType::END_OF_SOURCE) {
 		return;
 	}

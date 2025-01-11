@@ -30,6 +30,7 @@ enum class AlgebraicExprType {
 	SUM,
 	PRODUCT,
 	POWER,
+	DERIVATIVE
 };
 struct Context;
 struct IntegerExpr;
@@ -39,6 +40,7 @@ struct ProductExpr;
 struct SumExpr;
 struct SymbolExpr;
 struct FunctionExpr;
+struct DerivativeExpr;
 struct Symbol;
 
 using IntegerType = i64;
@@ -58,6 +60,7 @@ struct AlgebraicExpr {
 	bool isSum() const;
 	bool isSymbol() const;
 	bool isFunction() const;
+	bool isDerivative() const;
 
 	// Making this function so it's shorter. Also it can check if the type is correct.
 	const IntegerExpr* asInteger() const;
@@ -72,6 +75,8 @@ struct AlgebraicExpr {
 	SymbolExpr* asSymbol();
 	const FunctionExpr* asFunction() const;
 	FunctionExpr* asFunction();
+	const DerivativeExpr* asDerivative() const;
+	DerivativeExpr* asDerivative();
 
 	bool isFreeOfVariable(const Symbol* variable) const;
 };
@@ -124,6 +129,10 @@ struct UndefinedSymbol final : public Symbol {
 
 struct VariableSymbol final : public Symbol {
 	VariableSymbol(std::string&& name);
+};
+
+struct EulersNumberSymbol final : public Symbol {
+	EulersNumberSymbol();
 };
 
 struct IntegerExpr : public AlgebraicExpr {
@@ -190,6 +199,12 @@ struct PowerExpr : public AlgebraicExpr {
 	AlgebraicExprPtr exponent;
 
 	AlgebraicExprPtr clone(const Context& c) const;
+};
+
+struct DerivativeExpr : public AlgebraicExpr {
+	DerivativeExpr(AlgebraicExprPtr&& expr, const Symbol* symbol);
+	AlgebraicExprPtr expr;
+	const Symbol* symbol;
 };
 
 AlgebraicExprPtr algebraicExprClone(const Context& c, const AlgebraicExprPtr& expr);

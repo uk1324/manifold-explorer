@@ -62,11 +62,83 @@ std::optional<const Ast::Expr*> TestRunner::tryParse(
 
 }
 
+#include <algebra/Algebra/AstToExpr.hpp>
+
+std::optional<Algebra::AlgebraicExprPtr> TestRunner::tryMakeAlgebraicExpr(std::string_view name, const Ast::Expr* ast) {
+	auto expr = astToExpr(context, ast);
+	if (!expr.has_value()) {
+		printFailed(name);
+		putAstToExprError(std::cerr, expr.error());
+		return std::nullopt;
+	}
+	return std::move(*expr);
+}
+
+std::optional<Algebra::AlgebraicExprPtr> TestRunner::tryCompileSourceToAlgebraicExpr(std::string_view name, std::string_view source) {
+
+	std::vector<std::string> variables;
+	std::vector<std::string> functions;
+	for (const auto& symbol : context.symbols) {
+		variables.push_back(std::string(symbol->name));
+	}
+	for (const auto& function : context.functions) {
+		functions.push_back(std::string(function->name));
+	}
+
+	auto tokens = tryTokenize(name, source, variables, functions);
+	if (!tokens.has_value()) {
+		return std::nullopt;
+	}
+	auto ast = tryParse(name, source, *tokens, variables, functions);
+	if (!ast.has_value()) {
+		return std::nullopt;
+	}
+	auto expr = tryMakeAlgebraicExpr(name, *ast);
+	if (!expr.has_value()) {
+		return std::nullopt;
+	}
+	return std::move(expr);
+}
+
+#include <algebra/Algebra/PrintExpr.hpp>
+
+void TestRunner::printExpr(const Algebra::AlgebraicExprPtr& expr) {
+	if (printInNotation) {
+		printAlgebraicExprUsingNotation(expr);
+		put("");
+	} else {
+		printAlgebraicExpr(expr);
+	}
+}
+
+#include <algebra/Algebra/Simplification.hpp>
+#include <algebra/Algebra/ConstructionHelpers.hpp>
+
+void TestRunner::expectedEquals(std::string_view name, const Algebra::AlgebraicExprPtr& got, const Algebra::AlgebraicExprPtr& expected) {
+
+	const auto difference = Algebra::basicSimplifiy(context, AlgebraConstuctionHelpers::difference(Algebra::algebraicExprClone(context, got), Algebra::algebraicExprClone(context, expected)));
+
+	if (Algebra::algebraicExprEquals(difference, AlgebraConstuctionHelpers::integer(0))) {
+		printPassed(name);
+	} else {
+		printFailed(name);
+		put("expected:");
+		printExpr(Algebra::basicSimplifiy(context, expected));
+
+		put("got:");
+		printExpr(Algebra::basicSimplifiy(context, got));
+
+		put("simplified difference:");
+		printExpr(Algebra::basicSimplifiy(context, difference));
+	}
+}
+
 void TestRunner::printPassed(std::string_view name) {
 	put(TERMINAL_COLOR_GREEN "[PASSED] " TERMINAL_COLOR_RESET "%", name);
 }
 
 void TestRunner::printFailed(std::string_view name) {
+	failedTimes++;
 	put(TERMINAL_COLOR_RED "[FAILED] " TERMINAL_COLOR_RESET "%", name);
 }
 
