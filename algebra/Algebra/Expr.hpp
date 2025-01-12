@@ -46,6 +46,7 @@ struct Symbol;
 using IntegerType = i64;
 struct AlgebraicExpr {
 	AlgebraicExpr(AlgebraicExprType type);
+	virtual ~AlgebraicExpr() {};
 	AlgebraicExprType type;
 	// TODO: Implement a destructor that switches based on the type.
 	// unique_ptr requires expanding twice to get to the value in the debugger. Could implement a custom unique ptr. Could call it OwnPtr and have a function ownPtr<T> that construct it. Or maybe a constructor would work.

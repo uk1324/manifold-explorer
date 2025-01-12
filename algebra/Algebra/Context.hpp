@@ -1,11 +1,15 @@
 #pragma once
 
 #include "Functions.hpp"
+#include <list>
 
 namespace Algebra {
 
 struct Context {
 	Context();
+
+	std::list<VariableSymbol> variables;
+	Symbol* addVariable(std::string&& variableName);
 
 	const Sin sin;
 	const Cos cos;

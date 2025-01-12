@@ -346,12 +346,8 @@ namespace Symbols {
 
 using namespace Algebra;
 
-std::list<VariableSymbol> variables;
 Symbol* addVariable(std::string&& variableName) {
-	variables.push_back(VariableSymbol(std::move(variableName)));
-	auto ptr = &variables.back();
-	t.context.symbols.push_back(ptr);
-	return ptr;
+	return t.context.addVariable(std::move(variableName));
 }
 
 const auto a = addVariable("a");
@@ -610,6 +606,21 @@ void algebraicExpressionSimplifyTests() {
 		),
 		product(symbol(x), symbol(y), power(symbol(z), integer(4)))
 	);
+
+	// There was a bug in simplify product recursive. When the first term of (-1)(x) * (-1)(x) got simplified to 1 simplify product recursive returned [1] instead of []. Which caused the expression to not be fully simplified.
+	test(
+		"-x * -x * x ^ x -> x^(2 + x)",
+		product(
+			negate(symbol(x)),
+			product(
+				negate(symbol(x)),
+				power(symbol(x), symbol(x))
+			)
+		),
+		power(symbol(x), sum(integer(2), symbol(x)))
+	);
+
+	
 }
 
 #include <algebra/Algebra/Derivative.hpp>
@@ -716,12 +727,16 @@ void derivativeTests() {
 }
 
 #include <algebra/PrintingUtils.hpp>
+#include "randomTestsMain.hpp"
 
 void debugMain();
 
 int main() {
+	randomTestsMain();
+	return 0;
+
 	bool debug = true;
-	debug = false;
+	//debug = false;
 	if (debug) {
 		debugMain(); 
 	} else {
@@ -756,9 +771,13 @@ void debugMain() {
 	bool printAst = true;
 	bool printAlgebraicExpr = true;
 
-	std::string_view source = "0^x";
-	std::vector<std::string> variables{ "a", "b", "c", "x" };
-	std::vector<std::string> functions{ };
+	//std::string_view source = " 4.^     y ^ sin(  (81.) )";
+	//std::string_view source = "( -1 * ( 0^( 3^e ) ) )";
+	//std::string_view source = "( ( e^e ) * ( e^2 ) )";
+	//std::string_view source = "-(e)*-(e)  *  (e) ^(e)";
+	std::string_view source = "(4)  -  (z)  - (4.)  -  (z)";
+	std::vector<std::string> variables{ "a", "b", "c", "x", "y", "z", "e" };
+	std::vector<std::string> functions{ "sin" };
 
 	const auto& tokens = scanner.parse(source, constView(functions), constView(variables), scannerMessageHandler);
 	if (printTokens) {
@@ -780,8 +799,10 @@ void debugMain() {
 	}
 
 	Algebra::Context context;
-	Algebra::VariableSymbol x("x");
-	context.symbols.push_back(&x);
+	
+	for (const auto& symbol : variables) {
+		context.addVariable(std::string(symbol));
+	}
 	auto optAlgebraicExpr = astToExpr(context, *ast);
 	if (!optAlgebraicExpr.has_value()) {
 		putAstToExprError(std::cerr, optAlgebraicExpr.error());
@@ -789,7 +810,8 @@ void debugMain() {
 	}
 
 	auto e = std::move(*optAlgebraicExpr);
-	e = Algebra::derivative(context, Algebra::basicSimplifiy(context, e), &x);
+	e = Algebra::basicSimplifiy(context, e);
+	//e = Algebra::derivative(context, Algebra::basicSimplifiy(context, e), &x);
 
 	put("Algebraic expression:");
 	Algebra::printAlgebraicExpr(e);
@@ -798,4 +820,6 @@ void debugMain() {
 	put("Algebraic expression using notation:");
 	Algebra::printAlgebraicExprUsingNotation(e);
 	putnn("\n\n");
+
+	Algebra::isSimplifiedExpr(context, e);
 }

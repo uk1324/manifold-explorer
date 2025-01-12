@@ -62,3 +62,9 @@ Is this really an issue. If you simplify an expression and it turns out to be un
 Another issue is the order of operations. If you have an expression like (x^2)^(1/2) x^(1/2) then if you simplify left to right you wont notice the domain is actually x > 0
 
 For solving inequalitites the monoticity of functions can be used.
+
+e^(ln(sin(x)^2 + cos(x)^2 - 1))
+is evaluated as 0 by wolfram alpha
+same for 
+e^ln(0)
+this might be because e^(-inf) = 0

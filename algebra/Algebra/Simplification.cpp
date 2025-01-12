@@ -398,11 +398,25 @@ AlgebraicExprPtr basicSimplifyPower(const Context& c, const AlgebraicExprPtr& ex
 		}
 		return false;
 	};
+	auto isNegativeNumber = [](const AlgebraicExprPtr& exprPtr) {
+		if (exprPtr->isInteger()) {
+			return exprPtr->asInteger()->value < 0;
+		}
+		if (exprPtr->isRational()) {
+			// Assuming simplified form.
+			return exprPtr->asRational()->numerator < 0;
+		}
+		return false;
+	};
+
 	if (base->isIntegerValue(0)) {
 		if (isPositiveNumber(exponent)) {
 			return std::make_unique<IntegerExpr>(0);
+		} else if (isNegativeNumber(exponent)) {
+			return std::make_unique<SymbolExpr>(&c.undefined);
+		} else if (exponent->isIntegerValue(0)) {
+			return std::make_unique<IntegerExpr>(1);
 		} else {
-			// Could add the case of simplifying 0^0, but I would rather leave it unsimplified.
 			return std::make_unique<PowerExpr>(std::move(base), std::move(exponent));
 		}
 	}
@@ -572,11 +586,6 @@ AlgebraicExprPtr basicSimplifySum(const Context& c, const AlgebraicExprList& sum
 	return std::make_unique<SumExpr>(std::move(moreSimplifiedSummands));
 }
 
-struct ConstantFactorDeomposition {
-	AlgebraicExpr constantFactor;
-	AlgebraicExpr nonConstantFactor;
-};
-
 bool isConstant(const AlgebraicExprPtr& expr) {
 	return expr->isInteger() || expr->isRational();
 }
@@ -696,6 +705,10 @@ AlgebraicExprList basicSimplifySumRecursive(const Context& c, View<const Algebra
 		const auto gcd = integerGcd(numerator, denominator);
 		numerator /= gcd;
 		denominator /= gcd;
+
+		if (numerator == 0) {
+			return;
+		}
 
 		if (denominator == 1) {
 			simplifiedSummands.push_back(std::make_unique<IntegerExpr>(numerator));
@@ -921,6 +934,9 @@ AlgebraicExprList basicSimplifyProductRecursive(const Context& c, View<const Alg
 		denominator /= gcd;
 
 		if (denominator == 1) {
+			if (numerator == 1) {
+				return;
+			}
 			simplifiedFactors.push_back(std::make_unique<IntegerExpr>(numerator));
 		} else {
 			simplifiedFactors.push_back(std::make_unique<RationalExpr>(numerator, denominator));
@@ -1248,10 +1264,6 @@ bool Algebra::isSimplifiedExpr(const Context& c, const AlgebraicExprPtr& expr) {
 		return isRationalNumberInCanonicalForm(e->numerator, e->denominator);
 	}
 	case SYMBOL: {
-		const auto e = expr->asSymbol();
-		if (e->isUndefined()) {
-			return false;
-		}
 		return true;
 	}
 	case FUNCTION: {
@@ -1327,12 +1339,14 @@ bool Algebra::isSimplifiedExpr(const Context& c, const AlgebraicExprPtr& expr) {
 		if (e->exponent->isIntegerValue(0) || e->exponent->isIntegerValue(1)) {
 			return false;
 		}
-		if (e->base->isInteger()) {
+		if (e->exponent->isInteger()) {
+			// integer exponents are distribiuted over products. (ab)^n -> a^n b^n
 			if (!(b->isSymbol() || b->isSum() || b->isFunction() || b->isDerivative())) {
 				return false;
 			}
 		} else {
-			if (b->isIntegerValue(0) || b->isIntegerValue(1)) {
+			// Removed, because you can have for example 0^m. Where m is some negative expression that isn't easily simplified.
+			if (b->isIntegerValue(1)) {
 				return false;
 			}
 		}
