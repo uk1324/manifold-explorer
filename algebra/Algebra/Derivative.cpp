@@ -7,7 +7,7 @@
 
 using namespace Algebra;
 
-AlgebraicExprPtr Algebra::derivative(Context& c, const AlgebraicExprPtr& expr, const Symbol* variable) {
+AlgebraicExprPtr Algebra::derivative(const Context& c, const AlgebraicExprPtr& expr, const Symbol* variable) {
 	return basicSimplifiy(c, derivativeUnsimplified(c, expr, variable));
 }
 
@@ -17,7 +17,7 @@ Also there would be an issue with naming the parameters to a function. Technical
 So in summary there is
 Derivative(f(x), x) not Derivative(f, 0)(x). Where 0 is the argument index.
 */
-AlgebraicExprPtr Algebra::derivativeUnsimplified(Context& c, const AlgebraicExprPtr& expr, const Symbol* variable) {
+AlgebraicExprPtr Algebra::derivativeUnsimplified(const Context& c, const AlgebraicExprPtr& expr, const Symbol* variable) {
 	using namespace AlgebraConstuctionHelpers;
 	if (expr->isSymbol()) {
 		if (expr->asSymbol()->symbol == variable) {
@@ -38,6 +38,7 @@ AlgebraicExprPtr Algebra::derivativeUnsimplified(Context& c, const AlgebraicExpr
 		// So the derivative should be defined on (0, +inf).
 		// In sympy diff(Rational(0)**x, x) = nan
 		// Wolfram alpha gives the correct values for (0^x)', but fails for ((sin(x)^2 + cos(x)^2 - 1)^x)'.
+		// One way in which this is kind of true is that e^(-inf x) = e^(-inf) = 0. So according to this definition 0^x is zero if x > 0 and undefined if x <= 0. Depending on how you define 0 * inf. 
 
 		/*
 		expr can't be equal to x^0 because the expression is in simplified form. TODO: Write which rule this uses.
@@ -93,7 +94,7 @@ AlgebraicExprPtr Algebra::derivativeUnsimplified(Context& c, const AlgebraicExpr
 		for (i32 i = 0; i < factors.size(); i++) {
 			AlgebraicExprList derivativeFactors;
 			derivativeFactors.push_back(derivative(c, factors[i], variable));
-			for (i32 j = 0; i < factors.size(); i++) {
+			for (i32 j = 0; j < factors.size(); j++) {
 				if (j == i) {
 					continue;
 				}
@@ -112,17 +113,19 @@ AlgebraicExprPtr Algebra::derivativeUnsimplified(Context& c, const AlgebraicExpr
 		The automatic simplification algorithm can simplify the former more than the latter, because the former is already factored.
 		*/
 	}
-	if (expr->isFunction()) {
+	if (expr->isFunction() && expr->asFunction()->function->arity == 1) {
 		const auto functionExpr = expr->asFunction();
 		const auto fn = functionExpr->function;
 		const auto& arguments = functionExpr->arguments;
 		auto argumentDerivative = derivative(c, algebraicExprClone(c, arguments[0]), variable);
+		auto multipliedByArgumentDerivative = [&](AlgebraicExprPtr&& expr) -> AlgebraicExprPtr {
+			return product(std::move(expr), std::move(argumentDerivative));
+		};
 		switch (fn->type) {
 			using enum FunctionType;
 		case SIN: {
-			return product(
-				function(c.cos, algebraicExprClone(c, arguments[0])),
-				std::move(argumentDerivative)
+			return multipliedByArgumentDerivative(
+				function(c.cos, algebraicExprClone(c, arguments[0]))
 			);
 		}
 		case COS: {
@@ -133,15 +136,48 @@ AlgebraicExprPtr Algebra::derivativeUnsimplified(Context& c, const AlgebraicExpr
 			);
 		}
 		case LN: {
-			return power(
+			return multipliedByArgumentDerivative(power(
 				algebraicExprClone(c, arguments[0]),
 				integer(-1)
-			);
+			));
 		}
 
+		case ABS:
+			break;
+
+		case TAN: {
+			return multipliedByArgumentDerivative(power(
+				function(c.cos, algebraicExprClone(c, arguments[0])), 
+				integer(-2)
+			));
 		}
-		ASSERT_NOT_REACHED();
-		return c.makeUndefined();
+
+		case ASIN: {
+			return multipliedByArgumentDerivative(power(
+				sum(
+					integer(1), 
+					negate(power(algebraicExprClone(c, arguments[0]), integer(2)))
+				),
+				rational(-1, 2)
+			));
+		}
+
+		case ACOS: {
+			return multipliedByArgumentDerivative(negate(power(
+				sum(integer(1), negate(power(algebraicExprClone(c, arguments[0]), integer(2)))),
+				rational(-1, 2)
+			)));
+		}
+
+		case ATAN: return multipliedByArgumentDerivative(power(
+			sum(
+				integer(1),
+				power(algebraicExprClone(c, arguments[0]), integer(2))
+			),
+			integer(-1)
+		));
+
+		}
 	}
 
 	if (expr->isFreeOfVariable(variable)) {

@@ -23,6 +23,9 @@ void putAstToExprError(std::ostream& os, const AstToExprError& error) {
 	std::visit(overloaded{
 		[&](const AstToExprErrorUndefinedSymbol& e) {
 			put(os, "Undefined symbol %.", e.symbolName);
+		},
+		[&](const AstToExprErrorWrongArity& e) {
+			put(os, "'%' expects % arguments, but found %.", e.functionName, e.correctArity, e.gotArity);
 		}
 	}, error);
 }
@@ -53,8 +56,9 @@ std::expected<Algebra::AlgebraicExprPtr, AstToExprError> astToExpr(const Algebra
 			case MULTIPLY: CONVERT_BINARY_OP(product)
 			case DIVIDE: CONVERT_BINARY_OP(division)
 			case EXPONENTIATE: CONVERT_BINARY_OP(power)
-			return defaultValue();
 		}
+		ASSERT_NOT_REACHED();
+		return defaultValue();
 	}
 	case UNARY: {
 		const auto e = static_cast<const Ast::UnaryExpr*>(expr);
@@ -86,9 +90,29 @@ std::expected<Algebra::AlgebraicExprPtr, AstToExprError> astToExpr(const Algebra
 			arguments.push_back(std::move(*a));
 		}
 		for (const auto& f : c.functions) {
-			if (f->name == e->functionName) {
-				return function(f, std::move(arguments));
+			if (f->name != e->functionName) {
+				continue;
 			}
+			if (f->arity != arguments.size()) {
+				return std::unexpected(AstToExprErrorWrongArity{
+					.correctArity = f->arity,
+					.gotArity = i32(arguments.size()),
+					.functionName = f->name,
+				});
+			}
+			return function(f, std::move(arguments));
+		}
+		const auto sqrtName = "sqrt";
+		const auto sqrtArity = 1;
+		if (e->functionName == sqrtName) {
+			if (arguments.size() != sqrtArity) {
+				return std::unexpected(AstToExprErrorWrongArity{
+					.correctArity = sqrtArity,
+					.gotArity = i32(arguments.size()),
+					.functionName = sqrtName,
+				});
+			}
+			return power(std::move(arguments[0]), rational(1, 2));
 		}
 		return std::unexpected(AstToExprErrorUndefinedSymbol{ .symbolName = std::string(e->functionName) });
 	}

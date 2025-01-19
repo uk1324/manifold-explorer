@@ -73,6 +73,26 @@ void Algebra::printAlgebraicExprInternal(const AlgebraicExpr* expr) {
 		putnn(" )");
 	}
 
+	case CONDITIONAL: {
+		const auto e = expr->asConditional();
+		putnn("Conditional( ");
+		for (i32 i = 0; i < e->conditions.size(); i++) {
+			printLogicalExprNn(e->conditions[i]);
+			putnn(" -> ");
+			printAlgebraicExpr(e->results[i]);
+			if (i != e->conditions.size()) {
+				putnn(", ");
+			}
+		}
+		if (e->conditions.size() != e->results.size()) {
+			putnn(", ");
+			printAlgebraicExpr(e->results.back());
+			putnn(" )");
+		} else {
+			putnn(" )");
+		}
+	}
+
 	}
 	ASSERT_NOT_REACHED();
 }
@@ -95,6 +115,20 @@ void Algebra::printAlgebraicExprView(const View<const AlgebraicExprPtr>& view) {
 	}
 }
 
+void Algebra::printLogicalExprNn(const LogicalExprPtr& expr) {
+	switch (expr->type) {
+		using enum LogicalExprType;
+	case EQUAL: {
+		const auto e = expr->asEqual();
+		putnn("Eq( ");
+		printAlgebraicExprNn(e->lhs);
+		putnn(", ");
+		printAlgebraicExprNn(e->rhs);
+		putnn(" )");
+	}
+	}
+
+}
 
 void Algebra::printAlgebraicExprListUsingNotation(const AlgebraicExprList& list, std::string_view separator) {
 	for (i32 i = 0; i < list.size(); i++) {
@@ -102,6 +136,22 @@ void Algebra::printAlgebraicExprListUsingNotation(const AlgebraicExprList& list,
 		if (i != list.size() - 1) {
 			putnn("%", separator);
 		}
+	}
+}
+
+void Algebra::printLogicalExprUsingNotation(const LogicalExprPtr& expr) {
+	switch (expr->type) {
+		using enum LogicalExprType;
+	case EQUAL: {
+		const auto e = expr->asEqual();
+		putnn("( ");
+		printAlgebraicExprUsingNotation(e->lhs);
+		putnn(", ");
+		printAlgebraicExprUsingNotation(e->rhs);
+		putnn(" )");
+		break;
+	}
+		
 	}
 }
 
@@ -163,6 +213,26 @@ void Algebra::printAlgebraicExprUsingNotation(const AlgebraicExprPtr& exprPtr) {
 		printAlgebraicExprUsingNotation(exprPtr);
 		putnn(", % )", e->symbol->name);
 		return;
+	}
+
+	case CONDITIONAL: {
+		const auto e = expr->asConditional();
+		putnn("( ");
+		for (i32 i = 0; i < e->conditions.size(); i++) {
+			printLogicalExprUsingNotation(e->conditions[i]);
+			putnn(" -> ");
+			printAlgebraicExprUsingNotation(e->results[i]);
+			if (i != e->conditions.size()) {
+				putnn(", ");
+			}
+		}
+		if (e->conditions.size() != e->results.size()) {
+			putnn(", ");
+			printAlgebraicExprUsingNotation(e->results.back());
+			putnn(" )");
+		} else {
+			putnn(" )");
+		}
 	}
 
 	}

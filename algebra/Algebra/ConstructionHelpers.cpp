@@ -1,5 +1,6 @@
 #include "ConstructionHelpers.hpp"
 #include "Functions.hpp"
+#include <Assertions.hpp>
 
 using namespace AlgebraConstuctionHelpers;
 
@@ -17,6 +18,14 @@ AlgebraicExprPtr AlgebraConstuctionHelpers::sum(AlgebraicExprPtr&& a, AlgebraicE
 	list.push_back(std::move(b));
 	list.push_back(std::move(c));
 	return std::make_unique<SumExpr>(std::move(list));
+}
+
+AlgebraicExprPtr AlgebraConstuctionHelpers::trySum(AlgebraicExprList&& summands) {
+	ASSERT(summands.size() >= 1);
+	if (summands.size() == 1) {
+		return std::move(summands[0]);
+	}
+	return sum(std::move(summands));
 }
 
 AlgebraicExprPtr AlgebraConstuctionHelpers::difference(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b) {
@@ -44,6 +53,14 @@ AlgebraicExprPtr AlgebraConstuctionHelpers::product(AlgebraicExprPtr&& a, Algebr
 
 AlgebraicExprPtr AlgebraConstuctionHelpers::product(AlgebraicExprList&& factors) {
 	return std::make_unique<ProductExpr>(std::move(factors));
+}
+
+AlgebraicExprPtr AlgebraConstuctionHelpers::tryProduct(AlgebraicExprList&& factors) {
+	ASSERT(factors.size() >= 1);
+	if (factors.size() == 1) {
+		return std::move(factors[0]);
+	}
+	return product(std::move(factors));
 }
 
 AlgebraicExprPtr AlgebraConstuctionHelpers::division(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b) {
@@ -93,4 +110,23 @@ AlgebraicExprPtr AlgebraConstuctionHelpers::function(const Function& function, A
 
 AlgebraicExprPtr AlgebraConstuctionHelpers::function(const Function& function, AlgebraicExprList&& arguments) {
 	return ::function(&function, std::move(arguments));
+}
+
+AlgebraicExprPtr AlgebraConstuctionHelpers::conditional(LogicalExprList&& condition, AlgebraicExprList&& results) {
+	return std::make_unique<ConditionalExpr>(std::move(condition), std::move(results));
+}
+
+AlgebraicExprPtr AlgebraConstuctionHelpers::conditional(LogicalExprPtr&& c0, AlgebraicExprPtr&& r0, AlgebraicExprPtr&& r1) {
+	// initializer lists trying to copy?
+	//return conditional(LogicalExprList{ std::move(c0) }, AlgebraicExprList{ std::move(r0),  std::move(r1) });
+	LogicalExprList conditions;
+	conditions.push_back(std::move(c0));
+	AlgebraicExprList results;
+	results.push_back(std::move(r0));
+	results.push_back(std::move(r1));
+	return conditional(std::move(conditions), std::move(results));
+}
+
+LogicalExprPtr AlgebraConstuctionHelpers::equals(AlgebraicExprPtr&& lhs, AlgebraicExprPtr&& rhs){
+	return std::make_unique<EqualExpr>(std::move(lhs), std::move(rhs));
 }

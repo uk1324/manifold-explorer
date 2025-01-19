@@ -14,6 +14,11 @@ struct Context {
 	const Sin sin;
 	const Cos cos;
 	const Ln ln;
+	const Abs abs;
+	const Tan tan;
+	const Asin asin;
+	const Acos acos;
+	const Atan atan;
 
 	const EulersNumberSymbol e;
 

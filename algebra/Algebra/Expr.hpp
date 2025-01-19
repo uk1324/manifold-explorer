@@ -30,7 +30,8 @@ enum class AlgebraicExprType {
 	SUM,
 	PRODUCT,
 	POWER,
-	DERIVATIVE
+	DERIVATIVE,
+	CONDITIONAL
 };
 struct Context;
 struct IntegerExpr;
@@ -41,6 +42,7 @@ struct SumExpr;
 struct SymbolExpr;
 struct FunctionExpr;
 struct DerivativeExpr;
+struct ConditionalExpr;
 struct Symbol;
 
 using IntegerType = i64;
@@ -60,8 +62,10 @@ struct AlgebraicExpr {
 	bool isProduct() const;
 	bool isSum() const;
 	bool isSymbol() const;
+	bool isSymbolValue(const Symbol* symbol) const;
 	bool isFunction() const;
 	bool isDerivative() const;
+	bool isConditional() const;
 
 	// Making this function so it's shorter. Also it can check if the type is correct.
 	const IntegerExpr* asInteger() const;
@@ -78,6 +82,8 @@ struct AlgebraicExpr {
 	FunctionExpr* asFunction();
 	const DerivativeExpr* asDerivative() const;
 	DerivativeExpr* asDerivative();
+	const ConditionalExpr* asConditional() const;
+	ConditionalExpr* asConditional();
 
 	bool isFreeOfVariable(const Symbol* variable) const;
 };
@@ -85,10 +91,31 @@ struct AlgebraicExpr {
 using AlgebraicExprPtr = std::unique_ptr<Algebra::AlgebraicExpr>;
 using AlgebraicExprList = std::vector<AlgebraicExprPtr>;
 
+enum class LogicalExprType {
+	EQUAL
+};
+
+struct EqualExpr;
+
+struct LogicalExpr {
+	LogicalExpr(LogicalExprType type);
+	virtual ~LogicalExpr() {};
+	LogicalExprType type;
+
+	bool isEqual() const;
+
+	EqualExpr* asEqual();
+	const EqualExpr* asEqual() const;
+
+};
+
+using LogicalExprPtr = std::unique_ptr<LogicalExpr>;
+using LogicalExprList = std::vector<LogicalExprPtr>;
+
 // Using an enum to have an easy and deterministic way of comparing function symbols. If dynamic types are used then you need to handle cases where both names are equal, but the symbols aren't (this can break the sorting in the simplification algorithm). If you just used the pointers it wouldn't be determinstic. It would depend on the way those symbols were allocated. 
 // Duplicate names can happen for example in differential equation (duplicated constant names), but just doing the comparasion with the types won't help here so I don't know what to do but to resort to some global counting (which would be allocation order dependent) or to just use pointer comparasions.
 enum class FunctionType {
-	SIN, COS, LN
+	SIN, COS, LN, ABS, TAN, ASIN, ACOS, ATAN
 };
 
 struct Function {
@@ -208,7 +235,22 @@ struct DerivativeExpr : public AlgebraicExpr {
 	const Symbol* symbol;
 };
 
+struct ConditionalExpr : public AlgebraicExpr {
+	ConditionalExpr(LogicalExprList&& conditions, AlgebraicExprList&& results);
+
+	LogicalExprList conditions;
+	AlgebraicExprList results;
+};
+
 AlgebraicExprPtr algebraicExprClone(const Context& c, const AlgebraicExprPtr& expr);
 AlgebraicExprList algebraicExprListClone(const Context& c, const AlgebraicExprList& list);
+
+LogicalExprPtr logicalExprClone(const Context& c, const LogicalExprPtr& expr);
+LogicalExprList logicalExprListClone(const Context& c, const LogicalExprList& list);
+
+struct EqualExpr : LogicalExpr {
+	EqualExpr(AlgebraicExprPtr&& lhs, AlgebraicExprPtr&& rhs);
+	AlgebraicExprPtr lhs, rhs;
+};
 
 }

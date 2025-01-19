@@ -17,10 +17,14 @@
 		<DisplayString Condition="type == Algebra::AlgebraicExprType::PRODUCT">Product(...)</DisplayString>
 		<DisplayString Condition="type == Algebra::AlgebraicExprType::SUM">Sum(...)</DisplayString>
 		<DisplayString Condition="type == Algebra::AlgebraicExprType::POWER">Power(...)</DisplayString>
+		<DisplayString Condition="type == Algebra::AlgebraicExprType::FUNCTION">Function(...)</DisplayString>
 		<Expand>
 			<ExpandedItem Condition="type == Algebra::AlgebraicExprType::PRODUCT">((Algebra::ProductExpr*)this)->factors</ExpandedItem>
 
 			<ExpandedItem Condition="type == Algebra::AlgebraicExprType::SUM">((Algebra::SumExpr*)this)->summands</ExpandedItem>
+
+			<ExpandedItem Condition="type == Algebra::AlgebraicExprType::FUNCTION">((Algebra::FunctionExpr*)this)->function->name</ExpandedItem>
+			<ExpandedItem Condition="type == Algebra::AlgebraicExprType::FUNCTION">((Algebra::FunctionExpr*)this)->arguments</ExpandedItem>
 			
 			<Item Condition="type == Algebra::AlgebraicExprType::POWER" Name="[base]">((Algebra::PowerExpr*)this)->base</Item>
 			<Item Condition="type == Algebra::AlgebraicExprType::POWER" Name="[exponent]">((Algebra::PowerExpr*)this)->exponent</Item>

@@ -1,5 +1,7 @@
 #include "TestRunner.hpp"
 #include <algebra/Algebra/ConstructionHelpers.hpp>
+#include <algebra/Algebra/Integral.hpp>
+#include <StringStream.hpp>
 
 TestRunner t;
 
@@ -631,11 +633,11 @@ void derivativeTests() {
 	auto test = [](std::string_view name, const Symbol* symbol, std::string_view source, std::string_view expected) {
 		const auto gotExpr = t.tryCompileSourceToAlgebraicExpr(name, source);
 		if (!gotExpr.has_value()) {
-			return std::nullopt;
+			return;
 		}
 		const auto expectedExpr = t.tryCompileSourceToAlgebraicExpr(name, expected);
 		if (!expectedExpr.has_value()) {
-			return std::nullopt;
+			return;
 		}
 		const auto derivative = Algebra::derivative(t.context, Algebra::basicSimplifiy(t.context, *gotExpr), symbol);
 		t.expectedEquals(name, derivative, *expectedExpr);
@@ -724,6 +726,69 @@ void derivativeTests() {
 		"x^(1/2) + x^(-1)",
 		"(1/2)x^(-1/2) -x^(-2)"
 	);
+
+	test(
+		"D(asin(x), x) = 1/sqrt(1-x^2)",
+		x,
+		"asin(x)",
+		"1/sqrt(1-x^2)"
+	);
+
+	test(
+		"D(acos(x), x) = -1/sqrt(1-x^2)",
+		x,
+		"acos(x)",
+		"-1/sqrt(1-x^2)"
+	);
+	// D(ln(|x|), x) simplifying abs.
+	test(
+		"D(atan(x), x) = 1/(1 + x^2)",
+		x,
+		"atan(x)",
+		"1/(1 + x^2)"
+	);
+}
+
+void integralTests() {
+	using namespace AlgebraConstuctionHelpers;
+	using namespace Symbols;
+
+	auto test = [](std::string_view source) {
+		StringStream nameStream;
+		putnn(nameStream, "I(%)", source);
+		const auto& name = nameStream.string();
+
+		const auto gotExpr = t.tryCompileSourceToAlgebraicExpr(name, source);
+		if (!gotExpr.has_value()) {
+			return;
+		}
+		const auto integral = Algebra::integrate(t.context, Algebra::basicSimplifiy(t.context, *gotExpr), x, std::nullopt);
+		if (!integral.has_value()) {
+			t.printFailed(name);
+			put("Couldn't calculate integral.");
+			return;
+		}
+		const auto derivativeOfIntegral = Algebra::derivative(t.context, *integral, x);
+		t.expectedEquals(name, derivativeOfIntegral, *gotExpr);
+	};
+
+	test("0");
+	test("a");
+	test("x");
+	test("x^2");
+	test("1/x");
+	test("sin(x)");
+	test("cos(x)");
+	test("sin(x)cos(x)");
+	test("sin(x^2)x");
+	test("2x + 3x^2");
+	test("5x sin(x^2) cos(x^2)");
+	test("e^x");
+	test("2^x");
+	test("cos(x) 2^sin(x)");
+	test("2x(x^2 + 4)^5");
+	// 2x/(x^4 + 1) u = x^2
+	//test("(cos(x) + 2)(sin(x) + 3)");
 }
 
 #include <algebra/PrintingUtils.hpp>
@@ -732,11 +797,11 @@ void derivativeTests() {
 void debugMain();
 
 int main() {
-	randomTestsMain();
-	return 0;
+	/*randomTestsMain();
+	return 0;*/
 
 	bool debug = true;
-	//debug = false;
+	debug = false;
 	if (debug) {
 		debugMain(); 
 	} else {
@@ -747,6 +812,7 @@ int main() {
 		algebraicExpressionLessThanTests();
 		algebraicExpressionSimplifyTests();
 		derivativeTests();
+		integralTests();
 
 		if (t.failedTimes > 0) {
 			put(TERMINAL_COLOR_RED "Failed % tests." TERMINAL_COLOR_RESET, t.failedTimes);
@@ -759,6 +825,7 @@ int main() {
 #include <algebra/Parsing/AstPrint.hpp>
 #include <algebra/Algebra/PrintExpr.hpp>
 #include <algebra/Algebra/AstToExpr.hpp>
+#include <algebra/Algebra/Integral.hpp>
 #include <Put.hpp>
 
 void debugMain() {
@@ -775,8 +842,9 @@ void debugMain() {
 	//std::string_view source = "( -1 * ( 0^( 3^e ) ) )";
 	//std::string_view source = "( ( e^e ) * ( e^2 ) )";
 	//std::string_view source = "-(e)*-(e)  *  (e) ^(e)";
-	std::string_view source = "(4)  -  (z)  - (4.)  -  (z)";
-	std::vector<std::string> variables{ "a", "b", "c", "x", "y", "z", "e" };
+	//std::string_view source = "(4)  -  (z)  - (4.)  -  (z)";
+	std::string_view source = "sin(x^2) x";
+	std::vector<std::string> variables{ "x", "a", "b", "c", "y", "z", "e" };
 	std::vector<std::string> functions{ "sin" };
 
 	const auto& tokens = scanner.parse(source, constView(functions), constView(variables), scannerMessageHandler);
@@ -803,6 +871,7 @@ void debugMain() {
 	for (const auto& symbol : variables) {
 		context.addVariable(std::string(symbol));
 	}
+	auto x = &*context.variables.begin();
 	auto optAlgebraicExpr = astToExpr(context, *ast);
 	if (!optAlgebraicExpr.has_value()) {
 		putAstToExprError(std::cerr, optAlgebraicExpr.error());
@@ -811,6 +880,10 @@ void debugMain() {
 
 	auto e = std::move(*optAlgebraicExpr);
 	e = Algebra::basicSimplifiy(context, e);
+	auto i = Algebra::integrate(context, e, x, std::nullopt);
+	if (i.has_value()) {
+		e = Algebra::basicSimplifiy(context, std::move(*i));
+	}
 	//e = Algebra::derivative(context, Algebra::basicSimplifiy(context, e), &x);
 
 	put("Algebraic expression:");

@@ -84,6 +84,7 @@ std::optional<Algebra::AlgebraicExprPtr> TestRunner::tryCompileSourceToAlgebraic
 	for (const auto& function : context.functions) {
 		functions.push_back(std::string(function->name));
 	}
+	functions.push_back("sqrt");
 
 	auto tokens = tryTokenize(name, source, variables, functions);
 	if (!tokens.has_value()) {

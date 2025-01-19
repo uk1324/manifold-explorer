@@ -10,7 +10,16 @@ struct AstToExprErrorUndefinedSymbol {
 	std::string symbolName;
 };
 
-using AstToExprError = std::variant<AstToExprErrorUndefinedSymbol>;
+struct AstToExprErrorWrongArity {
+	i32 correctArity;
+	i32 gotArity;
+	std::string functionName;
+};
+
+using AstToExprError = std::variant<
+	AstToExprErrorUndefinedSymbol,
+	AstToExprErrorWrongArity
+>;
 
 void putAstToExprError(std::ostream& os, const AstToExprError& error);
 

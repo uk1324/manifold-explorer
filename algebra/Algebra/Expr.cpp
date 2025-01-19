@@ -40,12 +40,20 @@ bool Algebra::AlgebraicExpr::isSymbol() const {
 	return type == AlgebraicExprType::SYMBOL;
 }
 
+bool Algebra::AlgebraicExpr::isSymbolValue(const Symbol* symbol) const {
+	return isSymbol() && asSymbol()->symbol == symbol;
+}
+
 bool Algebra::AlgebraicExpr::isFunction() const {
 	return type == AlgebraicExprType::FUNCTION;
 }
 
 bool Algebra::AlgebraicExpr::isDerivative() const {
 	return type == AlgebraicExprType::DERIVATIVE;
+}
+
+bool Algebra::AlgebraicExpr::isConditional() const {
+	return type == AlgebraicExprType::CONDITIONAL;
 }
 
 const IntegerExpr* Algebra::AlgebraicExpr::asInteger() const {
@@ -112,6 +120,15 @@ DerivativeExpr* Algebra::AlgebraicExpr::asDerivative() {
 	return static_cast<DerivativeExpr*>(this);
 }
 
+const ConditionalExpr* Algebra::AlgebraicExpr::asConditional() const {
+	return const_cast<AlgebraicExpr*>(this)->asConditional();
+}
+
+ConditionalExpr* Algebra::AlgebraicExpr::asConditional() {
+	ASSERT(isConditional());
+	return static_cast<ConditionalExpr*>(this);
+}
+
 bool algebraicExprListFreeOfVariable(const AlgebraicExprList& list, const Symbol* symbol) {
 	for (const auto& a : list) {
 		if (!a->isFreeOfVariable(symbol)) {
@@ -156,8 +173,28 @@ bool AlgebraicExpr::isFreeOfVariable(const Symbol* variable) const {
 		return e->expr->isFreeOfVariable(variable);
 	}
 
+	case CONDITIONAL: {
+		const auto e = asConditional();
+	}
+
 	}
 	return false;
+}
+
+LogicalExpr::LogicalExpr(LogicalExprType type) 
+	: type(type) {}
+
+bool Algebra::LogicalExpr::isEqual() const {
+	return type == LogicalExprType::EQUAL;
+}
+
+EqualExpr* Algebra::LogicalExpr::asEqual() {
+	ASSERT(isEqual());
+	return static_cast<EqualExpr*>(this);
+}
+
+const EqualExpr* Algebra::LogicalExpr::asEqual() const {
+	return const_cast<LogicalExpr*>(this)->asEqual();
 }
 
 Function::Function(FunctionType type, std::string&& name, i32 arity) 
@@ -202,6 +239,11 @@ SumExpr::SumExpr(AlgebraicExprPtr&& lhs, AlgebraicExprPtr&& rhs)
 	summands.push_back(std::move(rhs));
 }
 
+ConditionalExpr::ConditionalExpr(LogicalExprList&& conditions, AlgebraicExprList&& results) 
+	: AlgebraicExpr(AlgebraicExprType::CONDITIONAL)
+	, conditions(std::move(conditions))
+	, results(std::move(results)) {}
+
 SumExpr::SumExpr(AlgebraicExprList&& summands)
 	: AlgebraicExpr(AlgebraicExprType::SUM)
 	, summands(std::move(summands)) {}
@@ -240,6 +282,7 @@ AlgebraicExprList Algebra::algebraicExprListClone(const Context& c, const Algebr
 }
 
 AlgebraicExprPtr Algebra::algebraicExprClone(const Context& c, const AlgebraicExprPtr& exprPtr) {
+
 	const auto expr = exprPtr.get();
 	switch (expr->type) {
 		using enum AlgebraicExprType;
@@ -274,8 +317,38 @@ AlgebraicExprPtr Algebra::algebraicExprClone(const Context& c, const AlgebraicEx
 		const auto e = expr->asDerivative();
 		return std::make_unique<DerivativeExpr>(algebraicExprClone(c, e->expr), e->symbol);
 	}
+
+	case CONDITIONAL: {
+		const auto e = expr->asConditional();
+		return std::make_unique<ConditionalExpr>(logicalExprListClone(c, e->conditions), algebraicExprListClone(c, e->results));
+	}
 	}
 
 	CHECK_NOT_REACHED();
 	return c.makeUndefined();
 }
+
+LogicalExprPtr Algebra::logicalExprClone(const Context& c, const LogicalExprPtr& expr) {
+
+	switch (expr->type) {
+		using enum LogicalExprType;
+	case EQUAL: {
+		const auto e = expr->asEqual();
+		return std::make_unique<EqualExpr>(algebraicExprClone(c, e->lhs), algebraicExprClone(c, e->rhs));
+	}
+	}
+	ASSERT_NOT_REACHED();
+}
+
+LogicalExprList Algebra::logicalExprListClone(const Context& c, const LogicalExprList& list) {
+	LogicalExprList result;
+	for (const auto& e : list) {
+		result.push_back(logicalExprClone(c, e));
+	}
+	return result;
+}
+
+EqualExpr::EqualExpr(AlgebraicExprPtr&& lhs, AlgebraicExprPtr&& rhs) 
+	: LogicalExpr(LogicalExprType::EQUAL) 
+	, lhs(std::move(lhs))
+	, rhs(std::move(rhs)) {}

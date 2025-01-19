@@ -9,11 +9,13 @@ using namespace Algebra;
 AlgebraicExprPtr sum(AlgebraicExprList&& list);
 AlgebraicExprPtr sum(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b);
 AlgebraicExprPtr sum(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b, AlgebraicExprPtr&& c);
+AlgebraicExprPtr trySum(AlgebraicExprList&& summands);
 AlgebraicExprPtr difference(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b);
 AlgebraicExprPtr negate(AlgebraicExprPtr&& e);
 AlgebraicExprPtr product(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b);
 AlgebraicExprPtr product(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b, AlgebraicExprPtr&& c);
 AlgebraicExprPtr product(AlgebraicExprList&& factors);
+AlgebraicExprPtr tryProduct(AlgebraicExprList&& factors);
 AlgebraicExprPtr division(AlgebraicExprPtr&& a, AlgebraicExprPtr&& b);
 AlgebraicExprPtr inverse(AlgebraicExprPtr&& a);
 
@@ -33,4 +35,12 @@ AlgebraicExprPtr function(const Function* function, AlgebraicExprPtr&& argument)
 AlgebraicExprPtr function(const Function* function, AlgebraicExprList&& arguments);
 AlgebraicExprPtr function(const Function& function, AlgebraicExprPtr&& argument);
 AlgebraicExprPtr function(const Function& function, AlgebraicExprList&& arguments);
+
+AlgebraicExprPtr conditional(LogicalExprList&& condition, AlgebraicExprList&& results);
+AlgebraicExprPtr conditional(
+	LogicalExprPtr&& c0, AlgebraicExprPtr&& r0,
+	AlgebraicExprPtr&& r1);
+
+LogicalExprPtr equals(AlgebraicExprPtr&& lhs, AlgebraicExprPtr&& rhs);
+
 }
