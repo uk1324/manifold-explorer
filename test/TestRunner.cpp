@@ -1,5 +1,6 @@
 #include "TestRunner.hpp"
 #include "Utils.hpp"
+#include <algebra/Algebra/Simplification.hpp>
 #include <Put.hpp>
 #include <algebra/Parsing/AstEquals.hpp>
 #include <algebra/Parsing/AstPrint.hpp>
@@ -98,7 +99,7 @@ std::optional<Algebra::AlgebraicExprPtr> TestRunner::tryCompileSourceToAlgebraic
 	if (!expr.has_value()) {
 		return std::nullopt;
 	}
-	return std::move(expr);
+	return Algebra::basicSimplifiy(context, *expr);
 }
 
 #include <algebra/Algebra/PrintExpr.hpp>
@@ -112,7 +113,6 @@ void TestRunner::printExpr(const Algebra::AlgebraicExprPtr& expr) {
 	}
 }
 
-#include <algebra/Algebra/Simplification.hpp>
 #include <algebra/Algebra/ConstructionHelpers.hpp>
 
 void TestRunner::expectedEquals(std::string_view name, const Algebra::AlgebraicExprPtr& got, const Algebra::AlgebraicExprPtr& expected) {

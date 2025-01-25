@@ -35,6 +35,7 @@ AlgebraicExprPtr function(const Function* function, AlgebraicExprPtr&& argument)
 AlgebraicExprPtr function(const Function* function, AlgebraicExprList&& arguments);
 AlgebraicExprPtr function(const Function& function, AlgebraicExprPtr&& argument);
 AlgebraicExprPtr function(const Function& function, AlgebraicExprList&& arguments);
+AlgebraicExprPtr derivative(AlgebraicExprPtr&& expr, const Symbol* symbol);
 
 AlgebraicExprPtr conditional(LogicalExprList&& condition, AlgebraicExprList&& results);
 AlgebraicExprPtr conditional(

@@ -26,7 +26,7 @@ Algebra::Context::Context()
 	symbols.push_back(&e);
 }
 
-Symbol* Context::addVariable(std::string&& variableName) {
+VariableSymbol* Context::addVariable(std::string&& variableName) {
 	variables.push_back(VariableSymbol(std::move(variableName)));
 	auto ptr = &variables.back();
 	symbols.push_back(ptr);

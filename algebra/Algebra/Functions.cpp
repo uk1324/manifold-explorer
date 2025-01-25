@@ -26,3 +26,6 @@ Acos::Acos()
 
 Atan::Atan()
 	: Function(FunctionType::ATAN, "atan", 1) {}
+
+FunctionSymbol::FunctionSymbol(std::string&& name, i32 arity)
+	: Function(FunctionType::SYMBOL, std::move(name), arity) {}

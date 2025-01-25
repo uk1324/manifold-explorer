@@ -144,11 +144,9 @@ void Algebra::printLogicalExprUsingNotation(const LogicalExprPtr& expr) {
 		using enum LogicalExprType;
 	case EQUAL: {
 		const auto e = expr->asEqual();
-		putnn("( ");
 		printAlgebraicExprUsingNotation(e->lhs);
-		putnn(", ");
+		putnn(" = ");
 		printAlgebraicExprUsingNotation(e->rhs);
-		putnn(" )");
 		break;
 	}
 		
@@ -210,7 +208,7 @@ void Algebra::printAlgebraicExprUsingNotation(const AlgebraicExprPtr& exprPtr) {
 	case DERIVATIVE: {
 		const auto e = expr->asDerivative();
 		putnn("D( ");
-		printAlgebraicExprUsingNotation(exprPtr);
+		printAlgebraicExprUsingNotation(e->expr);
 		putnn(", % )", e->symbol->name);
 		return;
 	}

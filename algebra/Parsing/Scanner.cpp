@@ -145,6 +145,7 @@ Token Scanner::identifier(u8 firstChar) {
 	for (const auto& name : functionNames) {
 		checkPrefix(name, TokenType::FUNCTION);
 	}
+	checkPrefix(dervativeFunctionName, TokenType::FUNCTION);
 	for (const auto& name : variableNames) {
 		checkPrefix(name, TokenType::VARIABLE);
 	}

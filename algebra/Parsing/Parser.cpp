@@ -172,8 +172,11 @@ Parser::PrimaryExprResult Parser::primaryExpr(std::optional<LhsOfBinaryExpr> bin
 		}
 
 	} else if (match(TokenType::FUNCTION)) {
+		const auto functionToken = peekPrevious();
 		lhsStart = peekPrevious().start();
-		lhs = function(tokenSource(peekPrevious()), lhsStart);
+		const auto functionName = tokenSource(functionToken);
+
+		lhs = function(tokenSource(functionToken), lhsStart);
 
 		if (match(TokenType::CARET)) {
 			return Parser::PrimaryExprResult{
@@ -282,6 +285,18 @@ Expr* Parser::exponentiationExpr(Expr* lhs, i64 start) {
 
 
 Expr* Parser::function(std::string_view name, i64 start) {
+	if (name == dervativeFunctionName) {
+		expect(TokenType::LEFT_PAREN);
+		const auto argument = expr();
+		expect(TokenType::COMMA);
+		expect(TokenType::VARIABLE);
+		const auto variableName = tokenSource(peekPrevious());
+		expect(TokenType::RIGHT_PAREN);
+		return astAllocator.allocate<DerivativeExpr>(
+			argument, variableName, start, peekPrevious().end()
+		);
+	}
+
 	// TODO: Maybe make a new error expected left paren after function name.
 	expect(TokenType::LEFT_PAREN);
 

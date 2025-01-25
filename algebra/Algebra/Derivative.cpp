@@ -177,6 +177,9 @@ AlgebraicExprPtr Algebra::derivativeUnsimplified(const Context& c, const Algebra
 			integer(-1)
 		));
 
+		case SYMBOL:
+			break;
+
 		}
 	}
 

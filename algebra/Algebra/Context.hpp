@@ -9,7 +9,7 @@ struct Context {
 	Context();
 
 	std::list<VariableSymbol> variables;
-	Symbol* addVariable(std::string&& variableName);
+	VariableSymbol* addVariable(std::string&& variableName);
 
 	const Sin sin;
 	const Cos cos;

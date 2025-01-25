@@ -9,6 +9,8 @@ AlgebraicExprPtr basicSimplifiy(const Context& c, const AlgebraicExprPtr& expr);
 LogicalExprPtr basicSimplifiyLogical(const Context& c, const LogicalExprPtr& expr);
 
 bool algebraicExprEquals(const AlgebraicExprPtr& aExprPtr, const AlgebraicExprPtr& bExprPtr);
+bool anyAlgebraicExprEquals(const AlgebraicExprPtr& expr, View<const AlgebraicExprPtr> exprs);
+bool anyAlgebraicExprEquals(const AlgebraicExprPtr& expr, const AlgebraicExprList& exprs);
 bool logicalExprEquals(const LogicalExprPtr& aExpr, const LogicalExprPtr& bExpr);
 // The expressions have to be in simplified form.
 bool algebraicExprLessThan(const Context& c, const AlgebraicExprPtr& aExprPtr, const AlgebraicExprPtr& bExprPtr);

@@ -88,3 +88,5 @@ I guess using computer algebra that isn't fully correct is nice for just explori
 You can still have algorithm that just type check if the input has some decision algorithm. For example have a gcd algorithm that takes a decision algorithm for a certain kind of expression as an input.
 
 How should conditionals be simplified.
+
+Writing dx/dx' prints ""internal error" in mathdf and prints an exception in console

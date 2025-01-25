@@ -36,4 +36,8 @@ struct Atan : public Function {
 	Atan();
 };
 
+struct FunctionSymbol : public Function {
+	FunctionSymbol(std::string&& name, i32 arity);
+};
+
 }

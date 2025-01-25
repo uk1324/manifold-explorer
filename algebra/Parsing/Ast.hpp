@@ -14,6 +14,7 @@ enum class ExprType {
 	UNARY,
 	IDENTIFIER,
 	FUNCTION,
+	DERIVATIVE,
 };
 
 struct Expr {
@@ -71,5 +72,11 @@ struct FunctionExpr : public Expr {
 	std::span<const Expr* const> arguments;
 };
 
+struct DerivativeExpr : public Expr {
+	DerivativeExpr(const Expr* expr, std::string_view variableName, i64 start, i64 end);
+
+	const Expr* expr;
+	std::string_view variableName;
+};
 
 }

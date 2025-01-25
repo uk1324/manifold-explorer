@@ -30,6 +30,16 @@ void putAstToExprError(std::ostream& os, const AstToExprError& error) {
 	}, error);
 }
 
+
+std::expected<const Algebra::Symbol*, AstToExprError> tryFindSymbol(const Algebra::Context& c, std::string_view name) {
+	for (const auto& s : c.symbols) {
+		if (s->name == name) {
+			return s;
+		}
+	}
+	return std::unexpected(AstToExprErrorUndefinedSymbol{ .symbolName = std::string(name) });
+}
+
 std::expected<Algebra::AlgebraicExprPtr, AstToExprError> astToExpr(const Algebra::Context& c, const Ast::Expr* expr) {
 	auto defaultValue = []() -> std::unique_ptr<Algebra::AlgebraicExpr> {
 		return std::make_unique<Algebra::IntegerExpr>(1);
@@ -74,14 +84,13 @@ std::expected<Algebra::AlgebraicExprPtr, AstToExprError> astToExpr(const Algebra
 	}
 	case IDENTIFIER: {
 		const auto e = static_cast<const Ast::IdentifierExpr*>(expr);
-		for (const auto& s : c.symbols) {
-			if (s->name == e->identifier) {
-				return symbol(s);
-			}
+		auto s = tryFindSymbol(c, e->identifier);
+		if (!s.has_value()) {
+			return std::unexpected(std::move(s.error()));
 		}
-		return std::unexpected(AstToExprErrorUndefinedSymbol{ .symbolName = std::string(e->identifier) });
+		return symbol(*s);
 	}
-	case FUNCTION:
+	case FUNCTION: {
 		const auto e = static_cast<const Ast::FunctionExpr*>(expr);
 		Algebra::AlgebraicExprList arguments;
 		for (const auto& argument : e->arguments) {
@@ -115,6 +124,17 @@ std::expected<Algebra::AlgebraicExprPtr, AstToExprError> astToExpr(const Algebra
 			return power(std::move(arguments[0]), rational(1, 2));
 		}
 		return std::unexpected(AstToExprErrorUndefinedSymbol{ .symbolName = std::string(e->functionName) });
+	}
+	case DERIVATIVE: {
+		const auto e = static_cast<const Ast::DerivativeExpr*>(expr);
+		auto s = tryFindSymbol(c, e->variableName);
+		if (!s.has_value()) {
+			return std::unexpected(std::move(s.error()));
+		}
+		auto expr = astToExpr(c, e->expr);
+		TEST(expr);
+		return derivative(std::move(*expr), s.value());
+	}
 	}
 	return defaultValue();
 }

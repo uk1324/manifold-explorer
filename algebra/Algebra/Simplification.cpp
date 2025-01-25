@@ -163,6 +163,20 @@ bool Algebra::algebraicExprEquals(const AlgebraicExprPtr& aExprPtr, const Algebr
 	return false;
 }
 
+
+bool Algebra::anyAlgebraicExprEquals(const AlgebraicExprPtr& expr, View<const AlgebraicExprPtr> exprs) {
+	for (const auto& e : exprs) {
+		if (algebraicExprEquals(expr, e)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool Algebra::anyAlgebraicExprEquals(const AlgebraicExprPtr& expr, const AlgebraicExprList& exprs) {
+	return anyAlgebraicExprEquals(expr, constView(exprs));
+}
+
 bool Algebra::logicalExprEquals(const LogicalExprPtr& aExpr, const LogicalExprPtr& bExpr) {
 	if (aExpr->type != bExpr->type) {
 		return false;
@@ -321,7 +335,7 @@ bool Algebra::algebraicExprLessThan(const Context& c, const AlgebraicExprPtr& aE
 			const auto b = static_cast<const SymbolExpr*>(bExpr);
 			if (a->function->name == b->symbol->name) {
 				// Put variables on the left of functions
-				return i32(a->function->type) < i32(b->symbol->type);
+				return true;
 			} else {
 				return a->function->name < b->symbol->name;
 			}
@@ -361,7 +375,14 @@ bool Algebra::algebraicExprLessThan(const Context& c, const AlgebraicExprPtr& aE
 		case CONDITIONAL: {
 			return true;
 		}
-		case SYMBOL:
+		case SYMBOL: {
+			const auto b = static_cast<const SymbolExpr*>(bExpr);
+			if ("D" == b->symbol->name) {
+				return true;
+			} else {
+				return "D" < b->symbol->name;
+			}
+		}
 		case FUNCTION:
 			break;
 		FUNCTION_LIKE_BREAK
@@ -378,7 +399,14 @@ bool Algebra::algebraicExprLessThan(const Context& c, const AlgebraicExprPtr& aE
 			}
 			return logicalExprListLessThan(c, a->conditions, b->conditions);
 		}
-		case SYMBOL:
+		case SYMBOL: {
+			const auto b = static_cast<const SymbolExpr*>(bExpr);
+			if ("if" == b->symbol->name) {
+				return true;
+			} else {
+				return "if" < b->symbol->name;
+			}
+		}
 		case FUNCTION:
 		case DERIVATIVE:
 			break;
@@ -1304,6 +1332,7 @@ AlgebraicExprPtr Algebra::basicSimplifiy(const Context& c, const AlgebraicExprPt
 			case ASIN:
 			case ACOS:
 			case ATAN:
+			case SYMBOL:
 				break;
 
 

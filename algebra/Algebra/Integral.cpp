@@ -8,18 +8,6 @@
 using namespace Algebra;
 using namespace AlgebraConstuctionHelpers;
 
-#define INTEGRAL_TABLE_STEP(antiderivative) \
-	{ \
-		auto a = antiderivative; \
-		if (integrationSteps.has_value()) { \
-			integrationSteps->steps.push_back(IntegralTableStep{ \
-				algebraicExprClone(c, integrand), \
-				algebraicExprClone(c, a) \
-			}); \
-		} \
-		return a; \
-	}
-
 bool isNotIntegerValue(const AlgebraicExprPtr& expr, IntegerType value) {
 	if (expr->isInteger()) {
 		return expr->asInteger()->value != value;
@@ -36,11 +24,11 @@ bool isNotIntegerValue(const AlgebraicExprPtr& expr, IntegerType value) {
 	return false;
 };
 
-AlgebraicExprPtr powerRule(const Context& c, const AlgebraicExprPtr& integrand, const AlgebraicExprPtr& b, const AlgebraicExprPtr& e, const Symbol* variableOfIntegration, std::optional<IntegrationStepsContext&> integrationSteps) {
+AlgebraicExprPtr powerRule(const Context& c, const AlgebraicExprPtr& integrand, const AlgebraicExprPtr& b, const AlgebraicExprPtr& e, const Symbol* variableOfIntegration) {
 	// TODO: Change to ln(abs(x))
-	auto case1 = [&]() { return function(c.ln, algebraicExprClone(c, b)); };
+	auto case1 = [&]() { return function(c.ln, function(c.abs, algebraicExprClone(c, b))); };
 	if (e->isIntegerValue(-1)) {
-		INTEGRAL_TABLE_STEP(case1());
+		return case1();
 	}
 
 	auto case2 = [&]() {
@@ -50,23 +38,23 @@ AlgebraicExprPtr powerRule(const Context& c, const AlgebraicExprPtr& integrand, 
 		);
 	};
 	if (isNotIntegerValue(e, -1)) {
-		INTEGRAL_TABLE_STEP(case2());
+		return case2();
 	}
 
-	INTEGRAL_TABLE_STEP(conditional(
+	return conditional(
 		equals(algebraicExprClone(c, b), integer(-1)), case1(),
 		case2()
-	));
+	);
 }
 
 // b^x
-AlgebraicExprPtr exponential(const Context& c, const AlgebraicExprPtr& integrand, const AlgebraicExprPtr& base, const Symbol* exponent, std::optional<IntegrationStepsContext&> integrationSteps) {
+AlgebraicExprPtr exponential(const Context& c, const AlgebraicExprPtr& integrand, const AlgebraicExprPtr& base, const Symbol* exponent) {
 	auto case1 = [&]() {
 		return integer(0);
 	};
 
 	if (base->isIntegerValue(1)) {
-		INTEGRAL_TABLE_STEP(case1());
+		return case1();
 	}
 
 	auto case2 = [&]() {
@@ -85,25 +73,25 @@ AlgebraicExprPtr exponential(const Context& c, const AlgebraicExprPtr& integrand
 	);
 }
 
-std::optional<AlgebraicExprPtr> integralTable(const Context& c, const AlgebraicExprPtr& integrand, const Symbol* variableOfIntegration, std::optional<IntegrationStepsContext&> integrationSteps) {
+std::optional<AlgebraicExprPtr> integralTable(const Context& c, const AlgebraicExprPtr& integrand, const Symbol* variableOfIntegration) {
 
 	if (integrand->isFreeOfVariable(variableOfIntegration)) {
 		return product(algebraicExprClone(c, integrand), symbol(variableOfIntegration));
 	}
 
 	if (integrand->isSymbolValue(variableOfIntegration)) {
-		return powerRule(c, integrand, integrand, integer(1), variableOfIntegration, integrationSteps);
+		return powerRule(c, integrand, integrand, integer(1), variableOfIntegration);
 	} else if (integrand->isPower()) {
 		const auto i = integrand->asPower();
 		const auto& b = i->base;
 		const auto& e = i->exponent;
 	
 		if (b->isSymbolValue(variableOfIntegration) && e->isFreeOfVariable(variableOfIntegration)) {
-			return powerRule(c, integrand, b, e, variableOfIntegration, integrationSteps);
+			return powerRule(c, integrand, b, e, variableOfIntegration);
 		}
 
 		if (b->isFreeOfVariable(variableOfIntegration) && e->isSymbolValue(variableOfIntegration)) {
-			return exponential(c, integrand, b, variableOfIntegration, integrationSteps);
+			return exponential(c, integrand, b, variableOfIntegration);
 		}
 
 		// 1/(1 + x^2)
@@ -125,9 +113,9 @@ std::optional<AlgebraicExprPtr> integralTable(const Context& c, const AlgebraicE
 			};
 
 			if (i->function == &c.sin) {
-				INTEGRAL_TABLE_STEP(negate(function(&c.cos, arg())));
+				return negate(function(&c.cos, arg()));
 			} else if (i->function == &c.cos) {
-				INTEGRAL_TABLE_STEP(function(&c.sin, arg()));
+				return function(&c.sin, arg());
 			}
 		}
 	}
@@ -135,11 +123,16 @@ std::optional<AlgebraicExprPtr> integralTable(const Context& c, const AlgebraicE
 	return std::nullopt;
 }
 
-std::optional<AlgebraicExprPtr> integralLinearity(const Context& c, const AlgebraicExprPtr& integrand, const Symbol* variableOfIntegration, std::optional<IntegrationStepsContext&> integrationSteps) {
+std::optional<AlgebraicExprPtr> integralLinearity(const Context& c, const AlgebraicExprPtr& integrand, const Symbol* variableOfIntegration) {
+
+	struct Factorization {
+		std::optional<AlgebraicExprPtr> constant;
+		AlgebraicExprPtr nonConstant;
+	};
 
 	auto decompose = [&c, &variableOfIntegration](const AlgebraicExprPtr& expr) {
 		if (!expr->isProduct()) {
-			return IntegralLinearityStep::Factorization{
+			return Factorization{
 				std::nullopt, algebraicExprClone(c, expr)
 			};
 		}
@@ -154,7 +147,7 @@ std::optional<AlgebraicExprPtr> integralLinearity(const Context& c, const Algebr
 			}
 		}
 		if (constant.size() <= 0) {
-			return IntegralLinearityStep::Factorization{
+			return Factorization{
 				std::nullopt, algebraicExprClone(c, expr)
 			};
 		}
@@ -163,12 +156,12 @@ std::optional<AlgebraicExprPtr> integralLinearity(const Context& c, const Algebr
 			// Cases like 1 + a are already handled by the integral table (the free of variable of integration case).
 			nonConstant.push_back(integer(1));
 		}
-		return IntegralLinearityStep::Factorization{
+		return Factorization{
 			tryProduct(std::move(constant)), tryProduct(std::move(nonConstant))
 		};
 	};
 
-	std::vector<IntegralLinearityStep::Factorization> summands;
+	std::vector<Factorization> summands;
 
 	if (integrand->isProduct()) {
 		auto decomposition = decompose(integrand);
@@ -185,27 +178,9 @@ std::optional<AlgebraicExprPtr> integralLinearity(const Context& c, const Algebr
 	}
 
 	AlgebraicExprList result;
-	std::vector<IntegralLinearityStep::Summand> stepSummands;
 
 	for (auto& summand : summands) {
-		std::optional<AlgebraicExprPtr> antiderivative;
-		if (integrationSteps.has_value()) {
-			IntegrationStepsContext steps{ .substitutionSymbols = integrationSteps->substitutionSymbols };
-			antiderivative = integrate(c, summand.nonConstant, variableOfIntegration, steps);
-			stepSummands.push_back(IntegralLinearityStep::Summand{
-				.factorization = {
-					summand.constant.has_value()
-						? std::optional(algebraicExprClone(c, *summand.constant))
-						: std::nullopt,
-					algebraicExprClone(c, summand.nonConstant)
-				},
-				.nonConstantIntegral = algebraicExprClone(c, *antiderivative),
-				.steps = std::move(steps.steps)
-			});
-			
-		} else {
-			antiderivative = integrate(c, summand.nonConstant, variableOfIntegration, integrationSteps);
-		}
+		auto antiderivative = integrate(c, summand.nonConstant, variableOfIntegration);
 
 		if (!antiderivative.has_value()) {
 			return std::nullopt;
@@ -296,71 +271,13 @@ void findSubstitutions(const Context& c, const AlgebraicExprPtr& expr, const Sym
 	}
 }
 
-AlgebraicExprPtr structuralyIdenticalSubstitiute(const Context& c, const AlgebraicExprPtr& expr, const AlgebraicExprPtr& toReplace, const AlgebraicExprPtr& replacement);
-
-AlgebraicExprList structuralyIdenticalSubstitiuteList(const Context& c, const AlgebraicExprList& exprList, const AlgebraicExprPtr& toReplace, const AlgebraicExprPtr& replacement) {
-	AlgebraicExprList result;
-	for (const auto& expr : exprList) {
-		result.push_back(structuralyIdenticalSubstitiute(c, expr, toReplace, replacement));
-	}
-	return result;
-}
-
-AlgebraicExprPtr structuralyIdenticalSubstitiute(const Context& c, const AlgebraicExprPtr& expr, const AlgebraicExprPtr& toReplace, const AlgebraicExprPtr& replacement) {
-
-	if (algebraicExprEquals(expr, toReplace)) {
-		return algebraicExprClone(c, replacement);
-	}
-
-	switch (expr->type) {
-		using enum AlgebraicExprType;
-	case INTEGER:
-	case RATIONAL:
-	case SYMBOL:
-	case DERIVATIVE: // TODO:
-	case CONDITIONAL:
-		return algebraicExprClone(c, expr);
-
-	case FUNCTION: {
-		const auto e = expr->asFunction();
-		return function(e->function, structuralyIdenticalSubstitiuteList(c, e->arguments, toReplace, replacement));
-	}
-
-	case SUM:
-		return sum(structuralyIdenticalSubstitiuteList(c, expr->asSum()->summands, toReplace, replacement));
-
-	case PRODUCT:
-		return product(structuralyIdenticalSubstitiuteList(c, expr->asProduct()->factors, toReplace, replacement));
-
-	case POWER: {
-		const auto e = expr->asPower();
-		return power(
-			structuralyIdenticalSubstitiute(c, e->base, toReplace, replacement),
-			structuralyIdenticalSubstitiute(c, e->exponent, toReplace, replacement)
-		);
-	}
-
-	}
-
-	ASSERT_NOT_REACHED();
-	return c.makeUndefined();
-}
-
-std::optional<AlgebraicExprPtr> integralSubstitutions(const Context& c, const AlgebraicExprPtr& integrand, const Symbol* variableOfIntegration, std::optional<IntegrationStepsContext&> integrationSteps) {
+std::optional<AlgebraicExprPtr> integralSubstitutions(const Context& c, const AlgebraicExprPtr& integrand, const Symbol* variableOfIntegration) {
 	AlgebraicExprList substitutionsToTry;
 	findSubstitutions(c, integrand, variableOfIntegration, substitutionsToTry);
 
 	for (const auto& substitution : substitutionsToTry) {
-		auto symbolData = VariableSymbol("u");
-		VariableSymbol* symbolPtr;
-		if (integrationSteps.has_value()) {
-			integrationSteps->substitutionSymbols.push_back(std::move(symbolData));
-			symbolPtr = &integrationSteps->substitutionSymbols.back();
-		} else {
-			symbolPtr = &symbolData;
-		}
-
-		const auto substitiuted = structuralyIdenticalSubstitiute(c, integrand, substitution, symbol(symbolPtr));
+		auto substitutionVariable = VariableSymbol("");
+		const auto substitiuted = structuralyIdenticalSubstitiute(c, integrand, substitution, symbol(&substitutionVariable));
 		const auto substitutionResult = basicSimplifiy(c,
 			division(
 				algebraicExprClone(c, substitiuted),
@@ -371,87 +288,31 @@ std::optional<AlgebraicExprPtr> integralSubstitutions(const Context& c, const Al
 			continue;
 		}
 
-		std::optional<AlgebraicExprPtr> result;
-		if (integrationSteps.has_value()) {
-			IntegrationStepsContext steps{ .substitutionSymbols = integrationSteps->substitutionSymbols };
-			result = integrate(c, substitutionResult, variableOfIntegration, steps);
-			if (result.has_value()) {
-				integrationSteps->steps.push_back(IntegralSubstitutionStep{
-					.substitution = algebraicExprClone(c, substitution),
-					.substitutionVariable = symbolPtr,
-					.steps = std::move(steps.steps),
-					.result = algebraicExprClone(c, *result),
-				});
-			}
-		} else {
-			result = integrate(c, substitutionResult, symbolPtr, std::nullopt);
-		}
+		const auto result = integrate(c, substitutionResult, &substitutionVariable);
+		
 		if (result.has_value()) {
-			return structuralyIdenticalSubstitiute(c, *result, symbol(symbolPtr), substitution);
+			return structuralyIdenticalSubstitiute(c, *result, symbol(&substitutionVariable), substitution);
 		}
 	}
 	return std::nullopt;
 }
 
-std::optional<AlgebraicExprPtr> Algebra::integrate(const Context& c, const AlgebraicExprPtr& integrand, const Symbol* variableOfIntegration, std::optional<IntegrationStepsContext&> integrationSteps) {
+std::optional<AlgebraicExprPtr> Algebra::integrate(const Context& c, const AlgebraicExprPtr& integrand, const Symbol* variableOfIntegration) {
 
-	auto result = integralTable(c, integrand, variableOfIntegration, integrationSteps);
+	auto result = integralTable(c, integrand, variableOfIntegration);
 	if (result.has_value()) {
 		return basicSimplifiy(c, *result);
 	}
 
-	result = integralLinearity(c, integrand, variableOfIntegration, integrationSteps);
+	result = integralLinearity(c, integrand, variableOfIntegration);
 	if (result.has_value()) {
 		return basicSimplifiy(c, *result);
 	}
 
-	result = integralSubstitutions(c, integrand, variableOfIntegration, integrationSteps);
+	result = integralSubstitutions(c, integrand, variableOfIntegration);
 	if (result.has_value()) {
 		return basicSimplifiy(c, *result);
 	}
 	// TODO: Expand the expression then try.
 	return std::nullopt;
-}
-
-Algebra::IntegrationStep::IntegrationStep(IntegrationStep&& other)
-	: type(type) {
-	switch (type) {
-		using enum IntegrationStepType;
-	case TABLE:
-		new (&table) IntegralTableStep(std::move(other.table));
-		break;
-
-	case LINEARITY:
-		new (&linearity) IntegralLinearityStep(std::move(other.linearity));
-		break;
-
-	case SUBSTITUTION:
-		new (&substitution) IntegralLinearityStep(std::move(other.linearity));
-		break;
-	}
-
-	ASSERT_NOT_REACHED();
-}
-
-IntegrationStep::IntegrationStep(IntegralTableStep&& s)
-	: table(std::move(s))
-	, type(IntegrationStepType::TABLE) {}
-
-IntegrationStep::IntegrationStep(IntegralLinearityStep&& s)
-	: linearity(std::move(s))
-	, type(IntegrationStepType::LINEARITY) {}
-
-IntegrationStep::IntegrationStep(IntegralSubstitutionStep&& s)
-	: substitution(std::move(s))
-	, type(IntegrationStepType::SUBSTITUTION) {}
-
-Algebra::IntegrationStep::~IntegrationStep() {
-	switch (type) {
-		using enum IntegrationStepType;
-
-	case TABLE: table.~IntegralTableStep(); break;
-	case LINEARITY: linearity.~IntegralLinearityStep(); break;
-	case SUBSTITUTION: substitution.~IntegralSubstitutionStep(); break;
-	}
-	ASSERT_NOT_REACHED();
 }

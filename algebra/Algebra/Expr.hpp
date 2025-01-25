@@ -2,6 +2,7 @@
 
 #include <Types.hpp>
 #include <vector>
+#include <View.hpp>
 #include <memory>
 #include <string>
 
@@ -91,6 +92,11 @@ struct AlgebraicExpr {
 using AlgebraicExprPtr = std::unique_ptr<Algebra::AlgebraicExpr>;
 using AlgebraicExprList = std::vector<AlgebraicExprPtr>;
 
+bool algebraicExprIsFreeOf(const AlgebraicExprPtr& expr, const AlgebraicExprPtr& freeOf);
+bool algebraicExprListIsFreeOf(const AlgebraicExprList& exprs, const AlgebraicExprPtr& freeOf);
+bool algebraicExprIsFreeOfList(const AlgebraicExprPtr& expr, View<const AlgebraicExprPtr> freeOfList);
+bool algebraicExprIsFreeOfList(const AlgebraicExprPtr& expr, const AlgebraicExprList& freeOfList);
+
 enum class LogicalExprType {
 	EQUAL
 };
@@ -115,7 +121,7 @@ using LogicalExprList = std::vector<LogicalExprPtr>;
 // Using an enum to have an easy and deterministic way of comparing function symbols. If dynamic types are used then you need to handle cases where both names are equal, but the symbols aren't (this can break the sorting in the simplification algorithm). If you just used the pointers it wouldn't be determinstic. It would depend on the way those symbols were allocated. 
 // Duplicate names can happen for example in differential equation (duplicated constant names), but just doing the comparasion with the types won't help here so I don't know what to do but to resort to some global counting (which would be allocation order dependent) or to just use pointer comparasions.
 enum class FunctionType {
-	SIN, COS, LN, ABS, TAN, ASIN, ACOS, ATAN
+	SIN, COS, LN, ABS, TAN, ASIN, ACOS, ATAN, SYMBOL
 };
 
 struct Function {
@@ -252,5 +258,8 @@ struct EqualExpr : LogicalExpr {
 	EqualExpr(AlgebraicExprPtr&& lhs, AlgebraicExprPtr&& rhs);
 	AlgebraicExprPtr lhs, rhs;
 };
+
+AlgebraicExprPtr structuralyIdenticalSubstitiute(const Context& c, const AlgebraicExprPtr& expr, const AlgebraicExprPtr& toReplace, const AlgebraicExprPtr& replacement);
+AlgebraicExprList structuralyIdenticalSubstitiuteList(const Context& c, const AlgebraicExprList& exprList, const AlgebraicExprPtr& toReplace, const AlgebraicExprPtr& replacement);
 
 }

@@ -181,6 +181,77 @@ bool AlgebraicExpr::isFreeOfVariable(const Symbol* variable) const {
 	return false;
 }
 
+#include "Simplification.hpp"
+
+bool Algebra::algebraicExprIsFreeOf(const AlgebraicExprPtr& expr, const AlgebraicExprPtr& freeOf) {
+	if (algebraicExprEquals(expr, freeOf)) {
+		return false;
+	}
+
+	switch (expr->type) {
+		using enum AlgebraicExprType;
+	case INTEGER:
+	case RATIONAL:
+		return true;
+
+	case SYMBOL: {
+		return true;
+	}
+
+	case FUNCTION: {
+		const auto e = expr->asFunction();
+		return algebraicExprListIsFreeOf(e->arguments, freeOf);
+	}
+	case SUM: {
+		const auto e = expr->asSum();
+		return algebraicExprListIsFreeOf(e->summands, freeOf);
+	}
+	case PRODUCT: {
+		const auto e = expr->asProduct();
+		return algebraicExprListIsFreeOf(e->factors, freeOf);
+	}
+	case POWER: {
+		const auto e = expr->asPower();
+		return algebraicExprIsFreeOf(e->base, freeOf) && algebraicExprIsFreeOf(e->exponent, freeOf);
+	}
+
+	case DERIVATIVE: {
+		const auto e = expr->asDerivative();
+		// The symbol doesn't have to be free of the variable for example Derivative(1, x) is free of x.
+		return algebraicExprIsFreeOf(e->expr, freeOf);
+	}
+
+	case CONDITIONAL: {
+		const auto e = expr->asConditional();
+		return algebraicExprListIsFreeOf(e->results, freeOf);
+	}
+
+	}
+	return false;
+}
+
+bool Algebra::algebraicExprListIsFreeOf(const AlgebraicExprList& exprs, const AlgebraicExprPtr& freeOf) {
+	for (const auto& e : exprs) {
+		if (!algebraicExprIsFreeOf(e, freeOf)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool Algebra::algebraicExprIsFreeOfList(const AlgebraicExprPtr& expr, View<const AlgebraicExprPtr> freeOfList) {
+	for (const auto& freeOf : freeOfList) {
+		if (!algebraicExprIsFreeOf(expr, freeOf)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool Algebra::algebraicExprIsFreeOfList(const AlgebraicExprPtr& expr, const AlgebraicExprList& freeOfList) {
+	return algebraicExprIsFreeOfList(expr, constView(freeOfList));
+}
+
 LogicalExpr::LogicalExpr(LogicalExprType type) 
 	: type(type) {}
 
@@ -348,7 +419,59 @@ LogicalExprList Algebra::logicalExprListClone(const Context& c, const LogicalExp
 	return result;
 }
 
+#include "ConstructionHelpers.hpp"
+
+using namespace AlgebraConstuctionHelpers;
+
 EqualExpr::EqualExpr(AlgebraicExprPtr&& lhs, AlgebraicExprPtr&& rhs) 
 	: LogicalExpr(LogicalExprType::EQUAL) 
 	, lhs(std::move(lhs))
 	, rhs(std::move(rhs)) {}
+
+AlgebraicExprList Algebra::structuralyIdenticalSubstitiuteList(const Context& c, const AlgebraicExprList& exprList, const AlgebraicExprPtr& toReplace, const AlgebraicExprPtr& replacement) {
+	AlgebraicExprList result;
+	for (const auto& expr : exprList) {
+		result.push_back(structuralyIdenticalSubstitiute(c, expr, toReplace, replacement));
+	}
+	return result;
+}
+
+AlgebraicExprPtr Algebra::structuralyIdenticalSubstitiute(const Context& c, const AlgebraicExprPtr& expr, const AlgebraicExprPtr& toReplace, const AlgebraicExprPtr& replacement) {
+
+	if (algebraicExprEquals(expr, toReplace)) {
+		return algebraicExprClone(c, replacement);
+	}
+
+	switch (expr->type) {
+		using enum AlgebraicExprType;
+	case INTEGER:
+	case RATIONAL:
+	case SYMBOL:
+	case DERIVATIVE: // TODO:
+	case CONDITIONAL:
+		return algebraicExprClone(c, expr);
+
+	case FUNCTION: {
+		const auto e = expr->asFunction();
+		return function(e->function, structuralyIdenticalSubstitiuteList(c, e->arguments, toReplace, replacement));
+	}
+
+	case SUM:
+		return sum(structuralyIdenticalSubstitiuteList(c, expr->asSum()->summands, toReplace, replacement));
+
+	case PRODUCT:
+		return product(structuralyIdenticalSubstitiuteList(c, expr->asProduct()->factors, toReplace, replacement));
+
+	case POWER: {
+		const auto e = expr->asPower();
+		return power(
+			structuralyIdenticalSubstitiute(c, e->base, toReplace, replacement),
+			structuralyIdenticalSubstitiute(c, e->exponent, toReplace, replacement)
+		);
+	}
+
+	}
+
+	ASSERT_NOT_REACHED();
+	return c.makeUndefined();
+}

@@ -21,7 +21,9 @@ AlgebraicExprPtr AlgebraConstuctionHelpers::sum(AlgebraicExprPtr&& a, AlgebraicE
 }
 
 AlgebraicExprPtr AlgebraConstuctionHelpers::trySum(AlgebraicExprList&& summands) {
-	ASSERT(summands.size() >= 1);
+	if (summands.size() == 0) {
+		return integer(0);
+	}
 	if (summands.size() == 1) {
 		return std::move(summands[0]);
 	}
@@ -56,7 +58,9 @@ AlgebraicExprPtr AlgebraConstuctionHelpers::product(AlgebraicExprList&& factors)
 }
 
 AlgebraicExprPtr AlgebraConstuctionHelpers::tryProduct(AlgebraicExprList&& factors) {
-	ASSERT(factors.size() >= 1);
+	if (factors.size() == 0) {
+		return integer(1);
+	}
 	if (factors.size() == 1) {
 		return std::move(factors[0]);
 	}
@@ -110,6 +114,10 @@ AlgebraicExprPtr AlgebraConstuctionHelpers::function(const Function& function, A
 
 AlgebraicExprPtr AlgebraConstuctionHelpers::function(const Function& function, AlgebraicExprList&& arguments) {
 	return ::function(&function, std::move(arguments));
+}
+
+AlgebraicExprPtr AlgebraConstuctionHelpers::derivative(AlgebraicExprPtr&& expr, const Symbol* symbol) {
+	return std::make_unique<DerivativeExpr>(std::move(expr), symbol);
 }
 
 AlgebraicExprPtr AlgebraConstuctionHelpers::conditional(LogicalExprList&& condition, AlgebraicExprList&& results) {

@@ -57,6 +57,15 @@ bool astEquals(const Expr* a, const Expr* b, bool compareLocations) {
 		return true;
 	}
 
+	case DERIVATIVE: {
+		const auto x = static_cast<const DerivativeExpr*>(a);
+		const auto y = static_cast<const DerivativeExpr*>(b);
+		if (x->variableName != y->variableName) {
+			return false;
+		}
+		return astEquals(x->expr, y->expr, compareLocations);
+	}
+
 	}
 
 	CHECK_NOT_REACHED();

@@ -1,5 +1,7 @@
 #include "TestRunner.hpp"
 #include <algebra/Algebra/ConstructionHelpers.hpp>
+#include <algebra/Algebra/Polynomial.hpp>
+#include <algebra/Algebra/OdeSolve.hpp>
 #include <algebra/Algebra/Integral.hpp>
 #include <StringStream.hpp>
 
@@ -762,7 +764,7 @@ void integralTests() {
 		if (!gotExpr.has_value()) {
 			return;
 		}
-		const auto integral = Algebra::integrate(t.context, Algebra::basicSimplifiy(t.context, *gotExpr), x, std::nullopt);
+		const auto integral = Algebra::integrate(t.context, Algebra::basicSimplifiy(t.context, *gotExpr), x);
 		if (!integral.has_value()) {
 			t.printFailed(name);
 			put("Couldn't calculate integral.");
@@ -772,11 +774,35 @@ void integralTests() {
 		t.expectedEquals(name, derivativeOfIntegral, *gotExpr);
 	};
 
+	auto testExpected = [](std::string_view source, std::string_view expected) {
+		StringStream nameStream;
+		putnn(nameStream, "I(%)", source);
+		const auto& name = nameStream.string();
+
+		const auto gotExpr = t.tryCompileSourceToAlgebraicExpr(name, source);
+		if (!gotExpr.has_value()) {
+			return;
+		}
+
+		const auto expectedExpr = t.tryCompileSourceToAlgebraicExpr(name, expected);
+		if (!expectedExpr.has_value()) {
+			return;
+		}
+
+		const auto integral = Algebra::integrate(t.context, Algebra::basicSimplifiy(t.context, *gotExpr), x);
+		if (!integral.has_value()) {
+			t.printFailed(name);
+			put("Couldn't calculate integral.");
+			return;
+		}
+		t.expectedEquals(name, *integral, *expectedExpr);
+	};
+
 	test("0");
 	test("a");
 	test("x");
 	test("x^2");
-	test("1/x");
+	testExpected("1/x", "ln(abs(x))");
 	test("sin(x)");
 	test("cos(x)");
 	test("sin(x)cos(x)");
@@ -789,6 +815,103 @@ void integralTests() {
 	test("2x(x^2 + 4)^5");
 	// 2x/(x^4 + 1) u = x^2
 	//test("(cos(x) + 2)(sin(x) + 3)");
+}
+
+void polynomialTests() {
+	using namespace Symbols;
+	using namespace AlgebraConstuctionHelpers;
+	auto testPolynomialDegree = [](std::string_view source, std::optional<i32> degree, const std::vector<std::string>& variablesSources) {
+		StringStream nameStream;
+		putnn(nameStream, "degree(%)", source);
+		const auto& name = nameStream.string();
+
+		AlgebraicExprList variables;
+		for (const auto& s : variablesSources) {
+			auto variableExpr = t.tryCompileSourceToAlgebraicExpr(name, s);
+			if (!variableExpr.has_value()) {
+				t.printFailed(name);
+				put("Failed to parse variable '%'.", s);
+				return;
+			}
+			variables.push_back(std::move(*variableExpr));
+		}
+
+		const auto gotExprOpt = t.tryCompileSourceToAlgebraicExpr(name, source);
+		if (!gotExprOpt.has_value()) {
+			return;
+		} 
+		const auto gotExpr = basicSimplifiy(t.context, *gotExprOpt);
+
+		const bool expectedIsPolynomial = degree.has_value();
+		if (isGeneralPolynomial(gotExpr, constView(variables)) != expectedIsPolynomial) {
+			t.printFailed(name);
+			put("Expected isPolynomial = %.", expectedIsPolynomial);
+			return;
+		}
+		if (!expectedIsPolynomial) {
+			t.printPassed(name);
+			return;
+		}
+		const auto gotDegree = generalPolynomialDegree(gotExpr, constView(variables));
+		if (gotDegree != degree) {
+			t.printFailed(name);
+			put("Expected % got %.", *degree, gotDegree);
+			return;
+		}
+		t.printPassed(name);
+	};
+
+	testPolynomialDegree("a x^2 y^2", 4, { "x", "y" });
+	testPolynomialDegree("a x^2 y^2", 2, { "x" });
+	testPolynomialDegree("x^2 + y^2", 2, { "x", "y" });
+	testPolynomialDegree("sin(x)^2 + 2 sin(x) + 3", 2, { "sin(x)" });
+	testPolynomialDegree("x/y + y", std::nullopt, { "x", "y" });
+	testPolynomialDegree("(x + 1)(x + 2)", std::nullopt, { "x" });
+	testPolynomialDegree("3 a b^2 c^3 d^4", 6, { "b", "d" });
+	testPolynomialDegree("2 x^2 y z^3 + a x z^6", 7, { "x", "z" });
+
+	auto testPolynomialCoefficient = [](std::string_view source, std::string_view variableSource, i32 power, std::optional<std::string_view> expected) {
+
+		StringStream nameStream;
+		putnn(nameStream, "coefficient(%, %, %) = ", source, variableSource, power);
+		if (expected.has_value()) {
+			putnn(nameStream, "%", *expected);
+		} else {
+			putnn(nameStream, "null");
+		}
+		const auto& name = nameStream.string();
+
+		const auto gotExpr = t.tryCompileSourceToAlgebraicExpr(name, source);
+		if (!gotExpr.has_value()) { return; }
+
+		const auto variableExpr = t.tryCompileSourceToAlgebraicExpr(name, variableSource);
+		if (!variableExpr.has_value()) { return; }
+
+
+		std::optional<AlgebraicExprPtr> expectedExpr;
+		if (expected.has_value()) {
+			expectedExpr = t.tryCompileSourceToAlgebraicExpr(name, *expected);
+		}
+
+		const auto got = generalPolynomialCoefficient(t.context, *gotExpr, *variableExpr, power);
+		if (got.has_value() != expected.has_value()) {
+			t.printFailed(name);
+			put("hasValue() expected % got %", expected.has_value(), got.has_value());
+			return;
+		}
+		if (!got.has_value()) {
+			t.printPassed(name);
+			return;
+		}
+		t.expectedEquals(name, *got, *expectedExpr);
+	};
+
+	testPolynomialCoefficient("ax^2 + bx + c", "x", 2, "a");
+	testPolynomialCoefficient("3x y^2 + 5x^2 y + 7x + 9", "x", 1, "3y^2 + 7");
+	testPolynomialCoefficient("3xy^2 + 5x^2 y + 7x + 9", "x", 3, "0");
+	testPolynomialCoefficient("2ln(x)x", "x", 1, std::nullopt);
+	testPolynomialCoefficient("2ln(x)x", "ln(x)", 1, "2x");
+	testPolynomialCoefficient("x^2 + 2ln(x)x", "x", 2, std::nullopt);
 }
 
 #include <algebra/PrintingUtils.hpp>
@@ -813,6 +936,7 @@ int main() {
 		algebraicExpressionSimplifyTests();
 		derivativeTests();
 		integralTests();
+		polynomialTests();
 
 		if (t.failedTimes > 0) {
 			put(TERMINAL_COLOR_RED "Failed % tests." TERMINAL_COLOR_RESET, t.failedTimes);
@@ -843,9 +967,21 @@ void debugMain() {
 	//std::string_view source = "( ( e^e ) * ( e^2 ) )";
 	//std::string_view source = "-(e)*-(e)  *  (e) ^(e)";
 	//std::string_view source = "(4)  -  (z)  - (4.)  -  (z)";
-	std::string_view source = "sin(x^2) x";
-	std::vector<std::string> variables{ "x", "a", "b", "c", "y", "z", "e" };
-	std::vector<std::string> functions{ "sin" };
+	std::vector<std::string> variables;
+	std::vector<std::string> functions;
+
+	Algebra::Context context;
+	auto t = context.addVariable("t");
+	const auto x = Algebra::FunctionSymbol("x", 1);
+	context.functions.push_back(&x);
+
+	for (const auto& variable : context.variables) {
+		variables.push_back(variable.name);
+	}
+	for (const auto& function : context.functions) {
+		functions.push_back(function->name);
+	}
+	std::string_view source = "2t + 3x(t)^2 + D(x(t), t)(6tx(t) + x(t)^2) ";
 
 	const auto& tokens = scanner.parse(source, constView(functions), constView(variables), scannerMessageHandler);
 	if (printTokens) {
@@ -866,12 +1002,9 @@ void debugMain() {
 		putnn("\n\n");
 	}
 
-	Algebra::Context context;
-	
 	for (const auto& symbol : variables) {
 		context.addVariable(std::string(symbol));
 	}
-	auto x = &*context.variables.begin();
 	auto optAlgebraicExpr = astToExpr(context, *ast);
 	if (!optAlgebraicExpr.has_value()) {
 		putAstToExprError(std::cerr, optAlgebraicExpr.error());
@@ -880,19 +1013,26 @@ void debugMain() {
 
 	auto e = std::move(*optAlgebraicExpr);
 	e = Algebra::basicSimplifiy(context, e);
-	auto i = Algebra::integrate(context, e, x, std::nullopt);
-	if (i.has_value()) {
-		e = Algebra::basicSimplifiy(context, std::move(*i));
+	const auto s = Algebra::odeSolve(context, e, &x, t);
+	if (!s.has_value()) {
+		return;
 	}
+
+	Algebra::printLogicalExprUsingNotation(*s);
+	//auto i = Algebra::integrate(context, e, x);
+	/*if (i.has_value()) {
+		e = Algebra::basicSimplifiy(context, std::move(*i));
+	}*/
+	
 	//e = Algebra::derivative(context, Algebra::basicSimplifiy(context, e), &x);
 
-	put("Algebraic expression:");
-	Algebra::printAlgebraicExpr(e);
-	putnn("\n\n");
+	//put("Algebraic expression:");
+	//Algebra::printAlgebraicExpr(e);
+	//putnn("\n\n");
 
-	put("Algebraic expression using notation:");
-	Algebra::printAlgebraicExprUsingNotation(e);
-	putnn("\n\n");
+	//put("Algebraic expression using notation:");
+	//Algebra::printAlgebraicExprUsingNotation(e);
+	//putnn("\n\n");
 
-	Algebra::isSimplifiedExpr(context, e);
+	//Algebra::isSimplifiedExpr(context, e);
 }

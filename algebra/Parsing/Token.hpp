@@ -3,6 +3,8 @@
 #include <string_view>
 #include "SourceInfo.hpp"	
 
+static const char* dervativeFunctionName = "D";
+
 enum class TokenType {
 	FLOAT,
 	PLUS,

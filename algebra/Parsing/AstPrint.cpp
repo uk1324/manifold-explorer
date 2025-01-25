@@ -68,6 +68,14 @@ void astPrint(const Expr* expr) {
 		putnn(" )");
 		return;
 	}
+
+	case DERIVATIVE: {
+		const auto e = static_cast<const DerivativeExpr*>(expr);
+		putnn("D(");
+		astPrint(e->expr);
+		putnn(", '%')", e->variableName);
+		return;
+	}
 	}
 
 	CHECK_NOT_REACHED();

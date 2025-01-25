@@ -27,6 +27,11 @@ FunctionExpr::FunctionExpr(std::string_view functionName, std::span<const Expr* 
 	, functionName(functionName)
 	, arguments(arguments) {}
 
+DerivativeExpr::DerivativeExpr(const Expr* expr, std::string_view variableName, i64 start, i64 end)
+	: Expr(ExprType::DERIVATIVE, start, end)
+	, variableName(variableName)
+	, expr(expr) {}
+
 Expr::Expr(ExprType type, i64 start, i64 end)
 	: type(type)
 	, sourceLocation(SourceLocation::fromStartEnd(start, end)) {}
