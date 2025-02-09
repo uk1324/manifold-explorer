@@ -912,6 +912,9 @@ void polynomialTests() {
 	testPolynomialCoefficient("2ln(x)x", "x", 1, std::nullopt);
 	testPolynomialCoefficient("2ln(x)x", "ln(x)", 1, "2x");
 	testPolynomialCoefficient("x^2 + 2ln(x)x", "x", 2, std::nullopt);
+
+	testPolynomialDegree("2x + 3x^(1/2) + 4", 1, { "x", "x^(1/2)" });
+	//testPolynomialCoefficient("ax + bx^(1/2)", "x", 1, "a");
 }
 
 #include <algebra/PrintingUtils.hpp>
@@ -981,7 +984,9 @@ void debugMain() {
 	for (const auto& function : context.functions) {
 		functions.push_back(function->name);
 	}
-	std::string_view source = "2t + 3x(t)^2 + D(x(t), t)(6tx(t) + x(t)^2) ";
+	//std::string_view source = "2t + 3x(t)^2 + D(x(t), t)(6tx(t) + x(t)^2) ";
+	//std::string_view source = "(2x(t) - t^2) + D(x(t), t)(2t - x(t)^2)";
+	std::string_view source = "(x(t) - 1/t)D(x(t), t) + x(t)/t^2";
 
 	const auto& tokens = scanner.parse(source, constView(functions), constView(variables), scannerMessageHandler);
 	if (printTokens) {

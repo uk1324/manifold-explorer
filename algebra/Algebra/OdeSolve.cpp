@@ -4,8 +4,158 @@
 #include "Simplification.hpp"
 #include "Integral.hpp"
 #include "Derivative.hpp"
+#include "ConstructionHelpers.hpp"
+using namespace AlgebraConstuctionHelpers;
 
 using namespace Algebra;
+
+struct BernoulliOrLinearEquationForm {
+	// a(t) x + b(t) x^r, where r is a rational number different than 1.
+	AlgebraicExprPtr a;
+	AlgebraicExprPtr b;
+	AlgebraicExprPtr exponent;
+	// If b = 0 we have a homogenous linear differentation equation
+	// If the previous doesn't hold and r = 0 we have a inhomogenous linear differentation equation
+};
+
+std::optional<BernoulliOrLinearEquationForm> tryMatchBernoulliOrLinearEquation(const Context& c, const AlgebraicExprPtr& expr, const VariableSymbol* x, const VariableSymbol* t) {
+	
+	AlgebraicExprList summands;
+	if (expr->isSum()) {
+		summands = algebraicExprListClone(c, expr->asSum()->summands);
+	} else {
+		summands.push_back(algebraicExprClone(c, expr));
+	}
+
+	AlgebraicExprList aSum;
+	AlgebraicExprList bSum;
+
+	std::optional<AlgebraicExprPtr> r;
+
+	enum FactorType {
+		X, X_TO_R, CONST, ERROR
+	};
+	auto findFactorType = [&r, &x, &c](const AlgebraicExprPtr& factor) -> FactorType {
+		if (factor->isSymbolValue(x)) {
+			return X;
+		} else if (factor->isPower()) {
+			const auto p = factor->asPower();
+			const auto& exponent = p->exponent;
+			if (p->base->isSymbolValue(x) && (exponent->isInteger() || exponent->isRational())) {
+				if (r.has_value()) {
+					if (!algebraicExprEquals(exponent, factor)) {
+						return ERROR;
+					}
+				} else {
+					r = algebraicExprClone(c, exponent);
+				}
+				return X_TO_R;
+			}
+		}
+		if (factor->isFreeOfVariable(x)) {
+			return CONST;
+		} 
+		return ERROR;
+	};
+
+	for (auto& summand : summands) {
+		AlgebraicExprList factors;
+		
+		if (summand->isProduct()) {
+			factors = std::move(summand->asProduct()->factors);
+		} else {
+			factors.push_back(std::move(summand));
+		}
+
+		std::optional<FactorType> factorType;
+		AlgebraicExprList constantFactors;
+
+		for (auto& factor : factors) {
+			const auto result = findFactorType(factor);
+			if (result == ERROR) {
+				return std::nullopt;
+			}
+			if (factorType == CONST) {
+				constantFactors.push_back(std::move(factor));
+			} else {
+				if (factorType.has_value()) {
+					if (result != factorType) {
+						// Cases like x * x^r
+						return std::nullopt;
+					}
+				} else {
+					factorType = result;
+				}
+			} 
+		}
+
+		if (factorType.has_value()) {
+			if (*factorType == X) {
+				aSum.push_back(tryProduct(std::move(constantFactors)));
+			} else { // X_TO_R
+				bSum.push_back(tryProduct(std::move(constantFactors)));
+			}
+		} else {
+			// Constant factor in inhomegenous linear equation a(t)x + b(t)x^0.
+			bSum.push_back(tryProduct(std::move(constantFactors)));
+			r = integer(0);
+		}
+	}
+
+	if (!r.has_value()) {
+		return std::nullopt;
+	}
+
+	return BernoulliOrLinearEquationForm{
+		.a = trySum(std::move(aSum)),
+		.b = trySum(std::move(bSum)),
+		.exponent = std::move(*r)
+	};
+
+	/*
+	Alternatively something like this could be done
+
+	r = findXWithPowerDifferentThan1(expr);
+
+	if (!r.hasValue()) {
+		// handle linear equation.
+	}
+
+	if (polynomialDegree(expr, { x, x^r }) != 1) {
+		return null;
+	}
+
+	// I don't think it would be possible to get the constant coefficient using just coefficient (non polynomial version with a single variable argument), because then it would do things like this I think.
+	// coefficient(x + x^(1/2), x, 0) = x^(1/2)
+
+	if (constantCoefficient(expr, { x, x^r } != 0) {
+		return std::nullopt;
+	}
+
+	const auto a = coefficient(expr, x);
+	if (!isFreeOf(a, x) {
+		return null;
+	}
+	const auto b = coefficient(expr, x);
+	if (!isFreeOf(b, x^r) {
+		return null;
+	}
+	return { a, b, r }
+	*/
+
+	// In sympy the is the match function
+	// a = Wildcard('a', exclude = [x])
+	// b = Wildcard('b', exclude = [x])
+	// c = Wildcard('c', exclude = [x])
+	// expr.match(a * x + b * x**c)
+
+	// Google "pattern matching symbolic expressions"
+	// https://www.numbas.org.uk/behind-the-design/pattern-matching.html#previous-work
+
+	// Matching against many patterns at once can also be optimized by expoiting the similarities between the patterns.
+	// https://www.google.com/search?client=firefox-b-d&q=pattern+matchin+with+asciotativty+and+commutativity
+	// https://stackoverflow.com/questions/8335187/pattern-matching-with-associative-and-commutative-operators
+};
 
 bool isDerivative(const AlgebraicExprPtr& e, const FunctionSymbol* dependent, const VariableSymbol* independent) {
 	if (!e->isDerivative()) {
@@ -28,10 +178,6 @@ struct OdeForm1 {
 	AlgebraicExprPtr a;
 	AlgebraicExprPtr b;
 };
-
-#include "ConstructionHelpers.hpp"
-
-using namespace AlgebraConstuctionHelpers;
 
 i32 derivativeOrder(const AlgebraicExprPtr& expr, const FunctionSymbol* dependent, const VariableSymbol* independent);
 
@@ -190,6 +336,7 @@ std::optional<EqualExpr> Algebra::tryExact(const Context& c, const AlgebraicExpr
 		switch (i) {
 		case 0: return symbol(dependent);
 		case 1: return symbol(independent);
+			// TODO: Instead of substituting w = xt could substitiute x = w/t. This might simplify better.
 		case 2: return product(symbol(dependent), symbol(independent));
 		}
 	};
@@ -305,7 +452,7 @@ std::optional<LogicalExprPtr> Algebra::odeSolve(const Context& c, const Algebrai
 	// Have to handle cases like derivatives that depend on x(t) and derivatives that are taken with respect to a different variable. Actually derivatives with respect to another variable will be zero, because the arity should be 1. Also things like delay differential equations need to be handled.
 
 	// Simplify to some canonical form then try to match agains patterns.
-
+	// Could first try doing without more simplification then try with more simplification. For example exercise 2 on page 167 gives an example.
 
  	const auto form1 = tryMatchOdeForm1(c, equation, dependent, independent);
 	if (form1.has_value()) {

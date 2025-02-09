@@ -1,5 +1,5 @@
 #include "Functions.hpp"
-#include "ConstructionHelpers.hpp";
+#include "ConstructionHelpers.hpp"
 
 using namespace AlgebraConstuctionHelpers;
 
